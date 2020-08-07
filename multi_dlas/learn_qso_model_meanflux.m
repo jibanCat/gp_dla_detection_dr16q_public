@@ -9,6 +9,8 @@ rng('default');
 
 % [train_dr12q] train_ind here to simplicity; move to other file in the future
 % train all of the spectra in dr12q with p_no_dlas > 0.9
+training_release = 'dr12q';
+training_set_name = 'dr12q_minus_gp';
 dla_catalog_name = 'dr12q_gp';
 train_ind = ...
     ['(catalog.filter_flags == 0)         & ' ...
