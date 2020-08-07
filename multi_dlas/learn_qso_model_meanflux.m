@@ -12,9 +12,7 @@ rng('default');
 training_release = 'dr12q';
 training_set_name = 'dr12q_minus_gp';
 dla_catalog_name = 'dr12q_gp';
-train_ind = ...
-    ['(catalog.filter_flags == 0)         & ' ...
-     ' processed.p_dlas < 0.1'];
+train_ind = 'processed.test_ind';
 
 % load catalog
 catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
@@ -34,6 +32,12 @@ processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_lyb_zwarn_occams_
 if (ischar(train_ind))
   train_ind = eval(train_ind);
 end
+
+% [train_dr12q] exclude p_dlas > 0.9
+ind = (processed.p_dlas > 0.9);
+train_ind(ind) = false;
+
+fprintf('Total training set size: %d', sum(train_ind));
 
 % select training vectors
 all_wavelengths    =    all_wavelengths(train_ind, :);
