@@ -7,6 +7,13 @@
 
 rng('default');
 
+% [train_dr12q] train_ind here to simplicity; move to other file in the future
+% train all of the spectra in dr12q with p_no_dlas > 0.9
+dla_catalog_name = 'dr12q_gp';
+train_ind = ...
+    ['(catalog.filter_flags == 0)         & ' ...
+     ' processed.p_dlas < 0.1'];
+
 % load catalog
 catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
 
@@ -15,6 +22,10 @@ variables_to_load = {'all_wavelengths', 'all_flux', 'all_noise_variance', ...
                      'all_pixel_mask'};
 load(sprintf('%s/preloaded_qsos', processed_directory(training_release)), ...
      variables_to_load{:});
+
+% [train_dr12q] also load the processed file
+processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_lyb_zwarn_occams_dr12q', ...
+  processed_directory(training_release)));
 
 % determine which spectra to use for training; allow string value for
 % train_ind
