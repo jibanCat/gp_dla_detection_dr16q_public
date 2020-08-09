@@ -89,6 +89,8 @@ if (ischar(test_ind))
   test_ind = eval(test_ind);
 end
 
+fprintf_debug('Debug:real size of the full data set: %i\n', sum(test_ind))
+
 all_wavelengths    =    all_wavelengths(test_ind);
 all_flux           =           all_flux(test_ind);
 all_noise_variance = all_noise_variance(test_ind);
@@ -96,7 +98,7 @@ all_pixel_mask     =     all_pixel_mask(test_ind);
 
 z_qsos = catalog.z_qsos(test_ind);
 
-num_quasars = numel(z_qsos);
+% num_quasars = numel(z_qsos);
 
 % preprocess model interpolants
 mu_interpolator = ...
@@ -142,30 +144,33 @@ for quasar_ind = 1:num_quasars
   tic;
   rng('default');  % random number should be set for each qso run
 
+  % add the offset of quasar index
+  quasar_ind_offset = quasar_ind + qsos_num_offset;
+
   % initialize an empty array for this sample log likelihood
   this_sample_log_likelihoods_dla = nan(num_dla_samples, max_dlas);
 
-  z_qso = z_qsos(quasar_ind);
+  z_qso = z_qsos(quasar_ind_offset);
 
   fprintf('processing quasar %i/%i (z_QSO = %0.4f) ...', ...
-        quasar_ind, num_quasars, z_qso);
+        quasar_ind_offset, num_quasars + qsos_num_offset, z_qso);
 
-  this_wavelengths    =    all_wavelengths{quasar_ind};
-  this_flux           =           all_flux{quasar_ind};
-  this_noise_variance = all_noise_variance{quasar_ind};
-  this_pixel_mask     =     all_pixel_mask{quasar_ind};
+  this_wavelengths    =    all_wavelengths{quasar_ind_offset};
+  this_flux           =           all_flux{quasar_ind_offset};
+  this_noise_variance = all_noise_variance{quasar_ind_offset};
+  this_pixel_mask     =     all_pixel_mask{quasar_ind_offset};
 
   % convert to QSO rest frame
   this_rest_wavelengths = emitted_wavelengths(this_wavelengths, z_qso);
 
-  ind = (this_rest_wavelengths >= min_lambda) & ...
-        (this_rest_wavelengths <= max_lambda);
+  unmasked_ind = (this_rest_wavelengths >= min_lambda) & ...
+                 (this_rest_wavelengths <= max_lambda);
 
   % keep complete copy of equally spaced wavelengths for absorption
   % computation
-  this_unmasked_wavelengths = this_wavelengths(ind);
+  this_unmasked_wavelengths = this_wavelengths(unmasked_ind);
 
-  ind = ind & (~this_pixel_mask);
+  ind = unmasked_ind & (~this_pixel_mask);
 
   this_wavelengths      =      this_wavelengths(ind);
   this_rest_wavelengths = this_rest_wavelengths(ind);
@@ -193,10 +198,14 @@ for quasar_ind = 1:num_quasars
   this_num_quasars = nnz(less_ind);
   this_p_dlas      = (this_num_dlas / this_num_quasars).^(1:max_dlas);
 
-  for i = 1:max_dlas
-    this_p_dlas(i) = this_p_dlas(i) - sum(this_p_dlas((i + 1):end));
-    log_priors_dla(quasar_ind, i) = log(this_p_dlas(i));
+  for i = 1:(max_dlas - 1)
+    this_p_dlas(i) = this_p_dlas(i) - this_p_dlas(i + 1);
   end
+  % make sure the sum of multi-DLA priors is equal to M / N, which is
+  % the prior for at least one DLA.
+  assert( abs(sum(this_p_dlas) - (this_num_dlas / this_num_quasars) ) < 1e-4 )
+
+  log_priors_dla(quasar_ind, :) = log(this_p_dlas);
 
   % lls priors : assume extrapolated log_nhi prior for lls
   % lls prior = M / N * Z_lls / Z_dla
@@ -325,7 +334,7 @@ for quasar_ind = 1:num_quasars
       ];
 
   % to retain only unmasked pixels from computed absorption profile
-  mask_ind = (~this_pixel_mask(ind));
+  mask_ind = (~this_pixel_mask(unmasked_ind));
 
   for num_dlas = 1:max_dlas
     % compute probabilities under DLA model for each of the sampled
@@ -503,14 +512,16 @@ variables_to_save = {'training_release', 'training_set_name', ...
                      'all_exceptions', 'sample_log_likelihoods_lls'};
 
 if (exist('test_ind', 'var'))
-  filename = sprintf('%s/processed_qsos_multi_meanflux%s', ...
+  filename = sprintf('%s/processed_qsos_multi_meanflux%s_%d-%d', ...
                      processed_directory(release), ...
-                     test_set_name);
+                     test_set_name, ...
+                     qsos_num_offset, qsos_num_offset + num_quasars);
 
   variables_to_save{end + 1} = 'test_ind';
 else
-  filename = sprintf('%s/processed_qsos_multi_meanflux', ...
-                     processed_directory(release));
+  filename = sprintf('%s/processed_qsos_multi_meanflux_%d_%d', ...
+                     processed_directory(release), ...
+                     qsos_num_offset, qsos_num_offset + num_quasars);
 end
 
 save(filename, variables_to_save{:}, '-v7.3');
