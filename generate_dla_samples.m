@@ -1,13 +1,13 @@
 % generate_dla_samples: generates DLA parameter samples from training
 % catalog
 
-% load training catalog
-catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
-
 % [train_dr12q] also load the processed file
 training_release = 'dr12q';
 processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_lyb_zwarn_occams_dr12q', ...
        processed_directory(training_release)));
+
+% load training catalog
+catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
 
 % generate quasirandom samples from p(normalized offset, log₁₀(N_HI))
 rng('default');
