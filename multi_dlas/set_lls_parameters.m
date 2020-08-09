@@ -13,6 +13,11 @@ extrapolate_min_log_nhi = 19.5;               % normalization range for the extr
 % load training catalog
 catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
 
+% [train_dr12q] also load the processed file
+training_release = 'dr12q';
+processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_lyb_zwarn_occams_dr12q', ...
+       processed_directory(training_release)));
+
 % generate quasirandom samples from p(normalized offset, log₁₀(N_HI))
 rng('default');
 sequence = scramble(haltonset(3), 'rr2');
@@ -32,9 +37,11 @@ u = makedist('uniform', ...
              'upper', uniform_max_log_nhi);
 
 % extract observed log₁₀ N_HI samples from catalog
-all_log_nhis = catalog.log_nhis(dla_catalog_name);
-ind = cellfun(@(x) (~isempty(x)), all_log_nhis);
-log_nhis = cat(1, all_log_nhis{ind});
+ind = (processed.p_dlas > 0.99);
+fprintf('Training for logNHI prior %d', sum(ind));
+
+% [train_dr12q] only get the first DLA out
+log_nhis = processed.MAP_log_nhis(ind, 1, 1);
 
 % make a quadratic fit to the estimated log p(log₁₀ N_HI) over the
 % specified range
