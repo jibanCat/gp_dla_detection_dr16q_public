@@ -161,4 +161,4 @@ dla_catalog_directory = @(name) ...
     sprintf('%s/dla_catalogs/%s/processed', base_directory, name);
 
 % replace with @(varargin) (fprintf(varargin{:})) to show debug statements
-fprintf_debug = @(varargin) ([]);
+fprintf_debug = @(varargin) (fprintf(varargin{:}));
