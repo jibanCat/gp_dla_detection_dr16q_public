@@ -39,7 +39,7 @@ for i = qso_start_ind:qso_end_ind
     set_lls_parameters;
 
     % start from the stopped ind last time
-    qsos_num_offset = (i - 1) * num_quasars;
+    qsos_num_offset = offset + (i - 1) * num_quasars;
 
     process_qsos_multiple_dlas_meanflux
 end

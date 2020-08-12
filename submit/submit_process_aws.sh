@@ -19,7 +19,7 @@ echo "----"
 # module load matlab
 
 # run matlab script
-matlab -nodesktop -nosplash -r "qso_start_ind = $1; qso_end_ind = $2; num_quasars = $3; parpool('local', 24); run_process; exit;"
+matlab -nodesktop -nosplash -r "qso_start_ind = $1; qso_end_ind = $2; num_quasars = $3; offset = $4; parpool('local', 24); run_process; exit;"
 
 echo "----"
 
