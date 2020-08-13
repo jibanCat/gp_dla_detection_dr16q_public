@@ -5,9 +5,11 @@ import numpy as np
 import matplotlib
 matplotlib.use('PDF')
 import matplotlib.pyplot as plt
-import calc_cddf
-import dla_data
-from save_figure import save_figure
+from . import calc_cddf
+from .dla_data import dla_data
+#from save_figure import save_figure
+
+save_figure = lambda filename : plt.savefig("{}.pdf".format(filename), format="pdf", dpi=300)
 
 def do_data_plots(cat, subdir):
     """Make a set of plots"""
