@@ -269,6 +269,17 @@ def do_compare_plots(cat7, cat7s, subdir,label):
     save_figure(path.join(subdir,"omega_"+label))
     plt.clf()
 
+def do_dla_statistics_plots(cat12: calc_cddf.DLACatalogue, subdir: str):
+    """
+    Do the plotting for CDDF, dN/dX, OmegaDLA,
+    including zQSO splitting checks, snr checks, and lowz cut checks.
+    """
+    do_data_plots(cat12, subdir)
+    do_qso_split(cat12, subdir)
+    do_snr_check(cat12, subdir)
+    do_lowzcut_check(cat12, subdir)
+
+
 if __name__=="__main__":
     #DR7 data
     #Using old samples
