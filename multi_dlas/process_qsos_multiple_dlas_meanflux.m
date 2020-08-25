@@ -65,9 +65,10 @@ prior = rmfield(prior, 'z_dlas');
 % load QSO model from training release
 variables_to_load = {'rest_wavelengths', 'mu', 'M', 'log_omega', ...
                      'log_c_0', 'log_tau_0', 'log_beta'};
-load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s',             ...
-             processed_directory(training_release), ...
-             training_set_name),                    ...
+load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d', ...
+             processed_directory(training_release),                 ...
+             training_set_name,                                     ...
+             int64(min_lambda), int64(max_lambda)),                 ...
      variables_to_load{:});
 
 % load DLA samples from training release
@@ -245,7 +246,11 @@ for quasar_ind = 1:num_quasars
   this_omega2 = exp(2 * this_log_omega);
 
   % Lyman series absorption effect for the noise variance
-  % note: this noise variance must be trained on the same number of members of Lyman series
+  % Note: this noise variance must be trained on the same number of members of Lyman series
+  % Note: this_wavelengths is within (min_lambda, max_lambda)
+  % so it may beyond lya_wavelength, so need an indicator;
+  % Note: 1 - exp( -0 ) + c_0 = c_0
+  indicator         = this_lya_zs <= z_qso;
   lya_optical_depth = tau_0 .* (1 + this_lya_zs).^beta;
 
   for l = 2:num_forest_lines
@@ -280,13 +285,17 @@ for quasar_ind = 1:num_quasars
       this_tau_0 .* ( (1 + this_lyseries_zs(:, l)).^prev_beta );
 
     % indicator function: z absorbers <= z_qso
-    if l > 1
-      indicator = this_lyseries_zs(:, l) > z_qso;
-      total_optical_depth(indicator, l) = nan;
-    end
+    % here is different from multi-dla processing script
+    % I choose to use zero instead or nan to indicate
+    % values outside of the Lyman forest
+    indicator = this_lyseries_zs(:, l) <= z_qso;
+    total_optical_depth(:, l) = total_optical_depth(:, l) .* indicator;
   end
 
-  lya_absorption = exp(- nansum(total_optical_depth, 2) );
+  % change from nansum to simply sum; shoudn't be different
+  % because we also change indicator from nan to zero,
+  % but if this script is glitchy then inspect this line
+  lya_absorption = exp(- sum(total_optical_depth, 2) );
   
   this_mu = this_mu .* lya_absorption;
   this_M  = this_M  .* lya_absorption;
