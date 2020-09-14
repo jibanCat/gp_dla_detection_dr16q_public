@@ -75,8 +75,9 @@ class DLACatalogue(object):
     """
     def __init__(self, processed_file = "processed_qsos_dr7q.mat", sample_file = "dla_samples.mat",
             raw_file = "preloaded_qsos_dr7.mat", snrs_file = "snrs_qsos_dr7.mat",
+            catalog_file = "catalog.mat",
             snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000,
-            max_z_dla_fix: Optional[float] = None, z_dla_minimum: float = 1.5):
+            z_dla_minimum: float = 1.5):
         #Should we include the second DLA?
         self.second_dla = second # False or 0: DLA(1); True or 1: DLA(2); 2: DLA(3); ...; k-1: DLA(k)
 
@@ -107,6 +108,7 @@ class DLACatalogue(object):
         self.proximity_zone = 0.1
         self.raw_file = raw_file
         self.processed_file = processed_file
+        self.catalog_file = catalog_file
         self.tophat_prior = False
 
         #Load data from the file
@@ -115,18 +117,29 @@ class DLACatalogue(object):
         self._z_min = self.filehandle["min_z_dlas"][0]
         self._z_max = self.filehandle["max_z_dlas"][0]
 
-        # [max zDLA bug fix] replace the max lambda to zQSO. Assgin max lambda in below
-        self.max_z_dla_fix = max_z_dla_fix
-        if max_z_dla_fix:
-            z_max = (1 / (self.max_z_dla_fix / lya_wavelength)) * (
-                1 + self._z_max + kms_to_z(3000)
-            ) - 1 - kms_to_z(3000)
-            self._z_max = z_max
+        self.test_ind = self.filehandle["test_ind"][0, :].astype(np.bool)
 
-        #Get z_qsos by adding `max_z_cut` back to `max_z_dlas`
-        # .. note:: defined in `set_parameters.m`, max_z_dla := z_qso - max_z_cut
-        #   where max_z_cut := kms_to_z(3000)
-        self.z_qsos = self._z_max + kms_to_z(3000)
+        # # [max zDLA bug fix] replace the max lambda to zQSO. Assgin max lambda in below
+        # self.max_z_dla_fix = max_z_dla_fix
+        # if max_z_dla_fix:
+        #     z_max = (1 / (self.max_z_dla_fix / lya_wavelength)) * (
+        #         1 + self._z_max + kms_to_z(3000)
+        #     ) - 1 - kms_to_z(3000)
+        #     self._z_max = z_max
+
+        # #Get z_qsos by adding `max_z_cut` back to `max_z_dlas`
+        # # .. note:: defined in `set_parameters.m`, max_z_dla := z_qso - max_z_cut
+        # #   where max_z_cut := kms_to_z(3000)
+        # self.z_qsos = self._z_max + kms_to_z(3000)
+
+        # [max_z_dlas] it is safer to get zQSO directly from the catalog
+        catalog = h5py.File(catalog_file, 'r')
+        z_qsos = catalog['z_qsos'][()]
+        self.z_qsos = z_qsos[self.test_ind]
+        assert self.z_qsos.shape[0] == self._z_max.shape[0]
+        # assert np.abs(self.z_qsos - (self._z_max + kms_to_z(3000))) < 1e-3
+        # the bug fix: could be removed in the future
+        self._z_max = self.z_qsos - kms_to_z(3000)
 
         #Index of each spectrum in the file containing the flux: raw_file
         #It's the indices we selected from `preloaded_qsos.mat` based on our `test_ind`
@@ -584,7 +597,7 @@ class DLACatalogue(object):
         assert z_min < z_max
         #Make a clean copy
         #Filter spectra that don't make the SNR cut
-        ind = self.filter_snr_spectra()
+        ind = self.filter_snr_spectra() * self.filter_z_dlas(self.z_dla_minimum)
         max_z_dlas = np.array(self.z_max())[ind]
         min_z_dlas = np.array(self.z_min())[ind]
         #Increase the minimum redshift to remove spectra contaminated by the lyman beta forest.
