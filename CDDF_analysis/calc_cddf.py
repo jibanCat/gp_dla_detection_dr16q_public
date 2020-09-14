@@ -23,6 +23,7 @@ NaN in any of log_priors_dla, log_likelihoods_no_dla and log_likelihoods_dla mea
 (NOT that there is zero probability of a DLA)
 This is about half the sample of spectra.
 """
+from typing import Optional
 
 import math
 #Complex number
@@ -67,11 +68,15 @@ class DLACatalogue(object):
             computed by `p_dla := 1 - p_no_dla` or `p_dla := 1 - p_no_dla - p_sub_dla`
         `log_norm_like_cache` (dict{np.ndarray}): cache normed `sample_log_likelihoods_dla`,
             p(D|M,zqso,θ) / p(M|zqso,D) / num_dla_samples
-
+        `max_z_dla_fix` (optional float): if float, then re-calculate the max_z_dla. This is
+            due to previous version of the MATLAB code used max(lambda)/lya_wavelength as
+            zQSO. This would be wrong if we load SDSS spectra more than 1216A. So with this
+            flag we cut all zDLA larger than zQSO.
     """
     def __init__(self, processed_file = "processed_qsos_dr7q.mat", sample_file = "dla_samples.mat",
             raw_file = "preloaded_qsos_dr7.mat", snrs_file = "snrs_qsos_dr7.mat",
-            snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000):
+            snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000,
+            max_z_dla_fix: Optional[float] = None):
         #Should we include the second DLA?
         self.second_dla = second # False or 0: DLA(1); True or 1: DLA(2); 2: DLA(3); ...; k-1: DLA(k)
 
@@ -105,6 +110,14 @@ class DLACatalogue(object):
         #First load small arrays
         self._z_min = self.filehandle["min_z_dlas"][0]
         self._z_max = self.filehandle["max_z_dlas"][0]
+
+        # [max zDLA bug fix] replace the max lambda to zQSO. Assgin max lambda in below
+        self.max_z_dla_fix = max_z_dla_fix
+        if max_z_dla_fix:
+            z_max = (1 / (self.max_z_dla_fix / lya_wavelength)) * (
+                1 + self._z_max + kms_to_z(3000)
+            ) - 1 - kms_to_z(3000)
+            self._z_max = z_max
 
         #Get z_qsos by adding `max_z_cut` back to `max_z_dlas`
         # .. note:: defined in `set_parameters.m`, max_z_dla := z_qso - max_z_cut
