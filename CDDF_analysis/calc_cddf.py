@@ -76,7 +76,7 @@ class DLACatalogue(object):
     def __init__(self, processed_file = "processed_qsos_dr7q.mat", sample_file = "dla_samples.mat",
             raw_file = "preloaded_qsos_dr7.mat", snrs_file = "snrs_qsos_dr7.mat",
             snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000,
-            max_z_dla_fix: Optional[float] = None):
+            max_z_dla_fix: Optional[float] = None, z_dla_minimum: float = 1.5):
         #Should we include the second DLA?
         self.second_dla = second # False or 0: DLA(1); True or 1: DLA(2); 2: DLA(3); ...; k-1: DLA(k)
 
@@ -88,6 +88,10 @@ class DLACatalogue(object):
         # the Occam's implementation for different DLA models is in self._log_norm_like
         # the additional Occam's razor implementation is in self.renormalise_occams_razor
         self.occams_razor = occams_razor
+
+        # [min_z_dla] the minimum requirement for the sampling range of zDLA;
+        # sometimes the sampling range is too small.
+        self.z_dla_minimum = z_dla_minimum
 
         #Spectra with a DLA probability below this value are assumed to have p = 0, as an optimization.
         #Can be set as high as 0.1 without changing results much.
@@ -494,6 +498,7 @@ class DLACatalogue(object):
         """
         inds_p_thresh   = (self._p_dla(second=second) > self.p_thresh_spec)
         inds_snr_thresh = self._filter_snr_spectra()
+        ind_z_dlas      = self.filter_z_dlas(self.z_dla_minimum)
 
         # select snrs with the same length as p_dla because it is possible we are running on a truncated file
         if len(inds_p_thresh) != len(inds_snr_thresh):
@@ -501,7 +506,7 @@ class DLACatalogue(object):
                 len(inds_p_thresh), len(inds_snr_thresh)))
             inds_snr_thresh = inds_snr_thresh[:len(inds_p_thresh)]
 
-        return np.where( inds_p_thresh * inds_snr_thresh )
+        return np.where( inds_p_thresh * inds_snr_thresh * ind_z_dlas )
 
     def _filter_snr_spectra(self):
         """Helper function to get SNR mask."""
@@ -525,6 +530,10 @@ class DLACatalogue(object):
     def set_snr(self, snr_thresh):
         """Set the value of SNR to be used, loading the SNR array if needed"""
         self.snr_thresh = snr_thresh
+
+    def filter_z_dlas(self, z_dla_minimum: float = 0.15):
+        """Filter out the spectra without enough sampling in zDLAs."""
+        return (self._z_max - self._z_min) > z_dla_minimum
 
     def _p_dla(self, *, second=False):
         """Get the probability of a DLA. If second=False, return the probabilities of at least one DLA in each spectrum.
