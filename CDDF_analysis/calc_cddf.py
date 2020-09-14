@@ -511,7 +511,7 @@ class DLACatalogue(object):
         """
         inds_p_thresh   = (self._p_dla(second=second) > self.p_thresh_spec)
         inds_snr_thresh = self._filter_snr_spectra()
-        ind_z_dlas      = self.filter_z_dlas(self.z_dla_minimum)
+        ind_z_dlas      = self._filter_z_dlas(self.z_dla_minimum)
 
         # select snrs with the same length as p_dla because it is possible we are running on a truncated file
         if len(inds_p_thresh) != len(inds_snr_thresh):
@@ -544,9 +544,13 @@ class DLACatalogue(object):
         """Set the value of SNR to be used, loading the SNR array if needed"""
         self.snr_thresh = snr_thresh
 
+    def _filter_z_dlas(self, z_dla_minimum: float = 0.15):
+        """Filter out the spectra without enough sampling in zDLAs."""
+        return ((self._z_max - self._z_min) > z_dla_minimum) * self.condition
+
     def filter_z_dlas(self, z_dla_minimum: float = 0.15):
         """Filter out the spectra without enough sampling in zDLAs."""
-        return (self._z_max - self._z_min) > z_dla_minimum
+        return np.where(self._filter_z_dlas(z_dla_minimum))
 
     def _p_dla(self, *, second=False):
         """Get the probability of a DLA. If second=False, return the probabilities of at least one DLA in each spectrum.
@@ -597,7 +601,7 @@ class DLACatalogue(object):
         assert z_min < z_max
         #Make a clean copy
         #Filter spectra that don't make the SNR cut
-        ind = self.filter_snr_spectra() * self.filter_z_dlas(self.z_dla_minimum)
+        ind = self._filter_snr_spectra() * self._filter_z_dlas(self.z_dla_minimum)
         max_z_dlas = np.array(self.z_max())[ind]
         min_z_dlas = np.array(self.z_min())[ind]
         #Increase the minimum redshift to remove spectra contaminated by the lyman beta forest.
