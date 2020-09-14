@@ -134,7 +134,7 @@ class DLACatalogue(object):
 
         # [max_z_dlas] it is safer to get zQSO directly from the catalog
         catalog = h5py.File(catalog_file, 'r')
-        z_qsos = catalog['z_qsos'][()]
+        z_qsos = catalog['z_qsos'][0, :]
         self.z_qsos = z_qsos[self.test_ind]
         assert self.z_qsos.shape[0] == self._z_max.shape[0]
         # assert np.abs(self.z_qsos - (self._z_max + kms_to_z(3000))) < 1e-3
