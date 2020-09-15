@@ -64,7 +64,8 @@ num_lines = 3;                                % number of members of the Lyman s
 
 max_z_cut = kms_to_z(3000);                   % max z_DLA = z_QSO - max_z_cut
 max_z_dla = @(wavelengths, z_qso) ...         % determines maximum z_DLA to search
-    (max(wavelengths) / lya_wavelength - 1) - max_z_cut;
+    min((max(wavelengths) / lya_wavelength - 1) - max_z_cut, ...
+        z_qso - max_z_cut);
 
 min_z_cut = kms_to_z(3000);                   % min z_DLA = z_Ly∞ + min_z_cut
 min_z_dla = @(wavelengths, z_qso) ...         % determines minimum z_DLA to search
