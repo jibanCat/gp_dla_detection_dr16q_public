@@ -125,6 +125,9 @@ lya_1pzs             = lya_1pzs(~is_empty, :);
 rest_fluxes          = rest_fluxes(~is_empty, :);
 rest_noise_variances = rest_noise_variances(~is_empty, :);
 all_lyman_1pzs       = all_lyman_1pzs(:, ~is_empty, :);
+% update num_quasars in consideration
+num_quasars = numel(z_qsos);
+fprintf('Get rid of empty spectra, num_quasars = %i\n', num_quasars);
 
 % mask noisy pixels
 ind = (rest_noise_variances > max_noise_variance);
@@ -177,9 +180,24 @@ mu = nanmean(rest_fluxes_div_exp1pz);
 centered_rest_fluxes = bsxfun(@minus, rest_fluxes_div_exp1pz, mu);
 clear('rest_fluxes', 'rest_fluxes_div_exp1pz');
 
+% [PCA NaNs replaced with medians]
+% make the NaNs to the medians of a given row;
+% rememeber not to inject this into the actual
+% joint likelihood maximisation
+pca_centered_rest_flux = centered_rest_fluxes;
+[num_quasars, ~] = size(pca_centered_rest_flux);
+for i = 1:num_quasars
+  this_pca_centered_rest_flux = pca_centered_rest_flux(i, :);
+
+  % assign median value for each row to nan
+  ind = isnan(this_pca_centered_rest_flux);
+
+  pca_centered_rest_flux(i, ind) = nanmedian(this_pca_centered_rest_flux);
+end
+
 % get top-k PCA vectors to initialize M
 [coefficients, ~, latent] = ...
-    pca(centered_rest_fluxes, ...
+    pca(pca_centered_rest_flux, ...
         'numcomponents', k, ...
         'rows',          'complete');
 
