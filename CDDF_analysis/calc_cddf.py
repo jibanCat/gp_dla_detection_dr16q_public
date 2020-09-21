@@ -208,8 +208,7 @@ class DLACatalogue(object):
         self.p_dla    = self.model_posteriors[:, 1+self.sub_dla:].sum(axis=1)
         self.p_no_dla = self.model_posteriors[:, :1+self.sub_dla].sum(axis=1)
 
-    @staticmethod
-    def _occams_model_posteriors(model_posteriors, occams_razor=10000):
+    def _occams_model_posteriors(self, model_posteriors, occams_razor=10000):
         '''
         re-calculate the model posteriors based on an additional occams_razor penalty
 
@@ -229,7 +228,11 @@ class DLACatalogue(object):
 
         model_posteriors = model_posteriors / normalisation
 
-        assert np.all( (0.8 < np.sum(model_posteriors, axis=1)) & (np.sum(model_posteriors, axis=1) < 1.2))
+        # [condition] filter out NaN p_dlas
+        condition = ~np.isnan(np.sum(model_posteriors, axis=1))
+        self.condition = self.condition * condition
+
+        assert np.all( condition * (0.8 < np.sum(model_posteriors, axis=1)) * (np.sum(model_posteriors, axis=1) < 1.2))
         return model_posteriors
 
     def get_first_dla_attrs(self):
