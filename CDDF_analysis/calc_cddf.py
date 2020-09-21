@@ -232,7 +232,7 @@ class DLACatalogue(object):
         condition = ~np.isnan(np.sum(model_posteriors, axis=1))
         self.condition = self.condition * condition
 
-        assert np.all( condition * (0.8 < np.sum(model_posteriors, axis=1)) * (np.sum(model_posteriors, axis=1) < 1.2))
+        assert np.all(((0.8 < np.sum(model_posteriors, axis=1)) * (np.sum(model_posteriors, axis=1) < 1.2))[condition])
         return model_posteriors
 
     def get_first_dla_attrs(self):
