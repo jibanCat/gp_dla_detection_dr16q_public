@@ -199,6 +199,7 @@ for quasar_ind = 1:num_quasars
   this_num_quasars = nnz(less_ind);
   this_p_dlas      = (this_num_dlas / this_num_quasars).^(1:max_dlas);
 
+  % the prior for having exactly k DLAs is (M / N)^k - (M / N)^(k + 1) 
   for i = 1:(max_dlas - 1)
     this_p_dlas(i) = this_p_dlas(i) - this_p_dlas(i + 1);
   end
@@ -343,6 +344,8 @@ for quasar_ind = 1:num_quasars
       ];
 
   % to retain only unmasked pixels from computed absorption profile
+  % this has to be done by using the unmasked_ind which has not yet
+  % been applied this_pixel_mask.
   mask_ind = (~this_pixel_mask(unmasked_ind));
 
   for num_dlas = 1:max_dlas
