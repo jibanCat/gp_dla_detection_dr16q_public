@@ -65,9 +65,10 @@ prior = rmfield(prior, 'z_dlas');
 % load QSO model from training release
 variables_to_load = {'rest_wavelengths', 'mu', 'M', 'log_omega', ...
                      'log_c_0', 'log_tau_0', 'log_beta'};
-load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s',             ...
-             processed_directory(training_release), ...
-             training_set_name),                    ...
+load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d', ...
+             processed_directory(training_release),                 ...
+             training_set_name,                                     ...
+             int64(min_lambda), int64(max_lambda)),                 ...
      variables_to_load{:});
 
 % load DLA samples from training release
@@ -89,6 +90,8 @@ if (ischar(test_ind))
   test_ind = eval(test_ind);
 end
 
+fprintf_debug('Debug:real size of the full data set: %i\n', sum(test_ind))
+
 all_wavelengths    =    all_wavelengths(test_ind);
 all_flux           =           all_flux(test_ind);
 all_noise_variance = all_noise_variance(test_ind);
@@ -96,7 +99,7 @@ all_pixel_mask     =     all_pixel_mask(test_ind);
 
 z_qsos = catalog.z_qsos(test_ind);
 
-num_quasars = numel(z_qsos);
+% num_quasars = numel(z_qsos);
 
 % preprocess model interpolants
 mu_interpolator = ...
@@ -142,18 +145,21 @@ for quasar_ind = 1:num_quasars
   tic;
   rng('default');  % random number should be set for each qso run
 
+  % add the offset of quasar index
+  quasar_ind_offset = quasar_ind + qsos_num_offset;
+
   % initialize an empty array for this sample log likelihood
   this_sample_log_likelihoods_dla = nan(num_dla_samples, max_dlas);
 
-  z_qso = z_qsos(quasar_ind);
+  z_qso = z_qsos(quasar_ind_offset);
 
   fprintf('processing quasar %i/%i (z_QSO = %0.4f) ...', ...
-        quasar_ind, num_quasars, z_qso);
+        quasar_ind_offset, num_quasars + qsos_num_offset, z_qso);
 
-  this_wavelengths    =    all_wavelengths{quasar_ind};
-  this_flux           =           all_flux{quasar_ind};
-  this_noise_variance = all_noise_variance{quasar_ind};
-  this_pixel_mask     =     all_pixel_mask{quasar_ind};
+  this_wavelengths    =    all_wavelengths{quasar_ind_offset};
+  this_flux           =           all_flux{quasar_ind_offset};
+  this_noise_variance = all_noise_variance{quasar_ind_offset};
+  this_pixel_mask     =     all_pixel_mask{quasar_ind_offset};
 
   % convert to QSO rest frame
   this_rest_wavelengths = emitted_wavelengths(this_wavelengths, z_qso);
@@ -241,7 +247,11 @@ for quasar_ind = 1:num_quasars
   this_omega2 = exp(2 * this_log_omega);
 
   % Lyman series absorption effect for the noise variance
-  % note: this noise variance must be trained on the same number of members of Lyman series
+  % Note: this noise variance must be trained on the same number of members of Lyman series
+  % Note: this_wavelengths is within (min_lambda, max_lambda)
+  % so it may beyond lya_wavelength, so need an indicator;
+  % Note: 1 - exp( -0 ) + c_0 = c_0
+  indicator         = this_lya_zs <= z_qso;
   lya_optical_depth = tau_0 .* (1 + this_lya_zs).^beta;
 
   for l = 2:num_forest_lines
@@ -276,13 +286,17 @@ for quasar_ind = 1:num_quasars
       this_tau_0 .* ( (1 + this_lyseries_zs(:, l)).^prev_beta );
 
     % indicator function: z absorbers <= z_qso
-    if l > 1
-      indicator = this_lyseries_zs(:, l) > z_qso;
-      total_optical_depth(indicator, l) = nan;
-    end
+    % here is different from multi-dla processing script
+    % I choose to use zero instead or nan to indicate
+    % values outside of the Lyman forest
+    indicator = this_lyseries_zs(:, l) <= z_qso;
+    total_optical_depth(:, l) = total_optical_depth(:, l) .* indicator;
   end
 
-  lya_absorption = exp(- nansum(total_optical_depth, 2) );
+  % change from nansum to simply sum; shoudn't be different
+  % because we also change indicator from nan to zero,
+  % but if this script is glitchy then inspect this line
+  lya_absorption = exp(- sum(total_optical_depth, 2) );
   
   this_mu = this_mu .* lya_absorption;
   this_M  = this_M  .* lya_absorption;
@@ -510,14 +524,16 @@ variables_to_save = {'training_release', 'training_set_name', ...
                      'all_exceptions', 'sample_log_likelihoods_lls'};
 
 if (exist('test_ind', 'var'))
-  filename = sprintf('%s/processed_qsos_multi_meanflux%s', ...
+  filename = sprintf('%s/processed_qsos_multi_meanflux%s_%d-%d', ...
                      processed_directory(release), ...
-                     test_set_name);
+                     test_set_name, ...
+                     qsos_num_offset, qsos_num_offset + num_quasars);
 
   variables_to_save{end + 1} = 'test_ind';
 else
-  filename = sprintf('%s/processed_qsos_multi_meanflux', ...
-                     processed_directory(release));
+  filename = sprintf('%s/processed_qsos_multi_meanflux_%d_%d', ...
+                     processed_directory(release), ...
+                     qsos_num_offset, qsos_num_offset + num_quasars);
 end
 
 save(filename, variables_to_save{:}, '-v7.3');

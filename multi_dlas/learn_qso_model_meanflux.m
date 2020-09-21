@@ -7,6 +7,13 @@
 
 rng('default');
 
+% [train_dr12q] train_ind here to simplicity; move to other file in the future
+% train all of the spectra in dr12q with p_no_dlas > 0.9
+training_release = 'dr12q';
+training_set_name = 'dr12q_minus_gp';
+dla_catalog_name = 'dr12q_gp';
+train_ind = 'processed.test_ind';
+
 % load catalog
 catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
 
@@ -16,11 +23,21 @@ variables_to_load = {'all_wavelengths', 'all_flux', 'all_noise_variance', ...
 load(sprintf('%s/preloaded_qsos', processed_directory(training_release)), ...
      variables_to_load{:});
 
+% [train_dr12q] also load the processed file
+processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_lyb_zwarn_occams_dr12q', ...
+  processed_directory(training_release)));
+
 % determine which spectra to use for training; allow string value for
 % train_ind
 if (ischar(train_ind))
   train_ind = eval(train_ind);
 end
+
+% [train_dr12q] exclude p_dlas > 0.9
+ind = (processed.p_dlas > 0.9);
+train_ind(ind) = false;
+
+fprintf('Total training set size: %d', sum(train_ind));
 
 % select training vectors
 all_wavelengths    =    all_wavelengths(train_ind, :);
@@ -58,7 +75,14 @@ for i = 1:num_quasars
               1 + (this_wavelengths - lya_wavelength) / lya_wavelength, ...
               rest_wavelengths);
 
-  % incldue all members in Lyman series to the forest
+  % this_wavelength is raw wavelength (w/t ind)
+  % so we need an indicator here to comfine lya_1pzs
+  % below Lyman alpha (do we need to make the indicator
+  % has a lower bound at Lyman limit here?)
+  % indicator = lya_1pzs(i, :) <= (1 + z_qso);
+  % lya_1pzs(i, :) = lya_1pzs(i, :) .* indicator;
+
+  % include all members in Lyman series to the forest
   for j = 1:num_forest_lines
     this_transition_wavelength = all_transition_wavelengths(j);
 
@@ -67,12 +91,10 @@ for i = 1:num_quasars
               1 + (this_wavelengths - this_transition_wavelength) / this_transition_wavelength, ... 
               rest_wavelengths);
 
-    if j > 1
-      % indicator function: z absorbers <= z_qso
-      indicator = all_lyman_1pzs(j, i, :) <= (1 + z_qso);
+    % indicator function: z absorbers <= z_qso
+    indicator = all_lyman_1pzs(j, i, :) <= (1 + z_qso);
 
-      all_lyman_1pzs(j, i, :) = all_lyman_1pzs(j, i, :) .* indicator;    
-    end
+    all_lyman_1pzs(j, i, :) = all_lyman_1pzs(j, i, :) .* indicator;
   end
 
   rest_fluxes(i, :) = ...
@@ -104,7 +126,8 @@ rest_noise_variances_exp1pz = nan(num_quasars, num_rest_pixels);
 
 for i = 1:num_quasars
   % compute the total optical depth from all Lyman series members
-  total_optical_depth = nan(num_forest_lines, num_rest_pixels);
+  % Apr 8: not using NaN here anymore due to range beyond Lya will all be NaNs
+  total_optical_depth = zeros(num_forest_lines, num_rest_pixels);
 
   for j = 1:num_forest_lines
     % calculate the oscillator strengths for Lyman series
@@ -118,7 +141,9 @@ for i = 1:num_quasars
     total_optical_depth(j, :) = this_tau_0 .* (this_lyman_1pzs.^prev_beta);
   end
 
-  lya_absorption = exp(- nansum(total_optical_depth, 1) );
+  % Apr 8: using zeros instead so not nansum here anymore
+  % beyond lya, absorption fcn shoud be unity
+  lya_absorption = exp(- sum(total_optical_depth, 1) );
 
   % We have to reverse the effect of Lyα for both mean-flux and observational noise
   rest_fluxes_div_exp1pz(i, :)      = rest_fluxes(i, :) ./ lya_absorption;
@@ -139,7 +164,7 @@ clear('rest_fluxes', 'rest_fluxes_div_exp1pz');
 
 objective_function = @(x) objective_lyseries(x, centered_rest_fluxes, lya_1pzs, ...
         rest_noise_variances_exp1pz, num_forest_lines, all_transition_wavelengths, ...
-        all_oscillator_strengths);
+        all_oscillator_strengths, z_qsos);
 
 % initialize A to top-k PCA components of non-DLA-containing spectra
 initial_M = bsxfun(@times, coefficients(:, 1:k), sqrt(latent(1:k))');
@@ -178,7 +203,8 @@ variables_to_save = {'training_release', 'train_ind', 'max_noise_variance', ...
                      'log_c_0', 'log_tau_0', 'log_beta', 'log_likelihood', ...
                      'minFunc_output'};
 
-save(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s',             ...
+save(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d',             ...
              processed_directory(training_release), ...
-             training_set_name), ...
+             training_set_name, ...
+             int64(min_lambda), int64(max_lambda)), ...
      variables_to_save{:}, '-v7.3');

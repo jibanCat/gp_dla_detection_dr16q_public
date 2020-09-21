@@ -126,10 +126,11 @@ class QSOLoader(object):
 
         # store small arrays
         self.z_qsos     = self.catalogue_file['z_qsos'][0, :]
-        self.snrs_cat   = self.catalogue_file['snrs'][0, :]
+        # catalogue snrs is unused
+        # self.snrs_cat   = self.catalogue_file['snrs'][0, :]
 
         self.z_qsos = self.z_qsos[self.test_ind]
-        self.snrs_cat   = self.snrs_cat[self.test_ind]
+        # self.snrs_cat   = self.snrs_cat[self.test_ind]
 
         # [Occams Razor] Update model posteriors with an additional occam's razor
         # updating: 1) model_posteriors, p_dlas, p_no_dlas
@@ -165,7 +166,7 @@ class QSOLoader(object):
         self.mjds             = self.mjds[~nan_inds]
         self.fiber_ids        = self.fiber_ids[~nan_inds]
         self.z_qsos           = self.z_qsos[~nan_inds]
-        self.snrs_cat         = self.snrs_cat[~nan_inds]
+        # self.snrs_cat         = self.snrs_cat[~nan_inds]
         self.snrs             = self.snrs[~nan_inds]
         self.log_priors_dla   = self.log_priors_dla[~nan_inds]
 

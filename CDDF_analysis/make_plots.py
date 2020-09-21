@@ -5,14 +5,16 @@ import numpy as np
 import matplotlib
 matplotlib.use('PDF')
 import matplotlib.pyplot as plt
-import calc_cddf
-import dla_data
-from save_figure import save_figure
+from . import calc_cddf
+from .dla_data import dla_data
+#from save_figure import save_figure
 
-def do_data_plots(cat, subdir):
+save_figure = lambda filename : plt.savefig("{}.pdf".format(filename), format="pdf", dpi=300)
+
+def do_data_plots(cat, subdir, z_dla_max = 5):
     """Make a set of plots"""
     dla_data.noterdaeme_12_data()
-    (l_N, cddf, cddf68, cddf95) = cat.plot_cddf(zmax=5,color="blue")
+    (l_N, cddf, cddf68, cddf95) = cat.plot_cddf(zmax=z_dla_max,color="blue")
     np.savetxt(path.join(subdir,"cddf_all.txt"), (l_N, cddf, cddf68[:,0], cddf68[:,1], cddf95[:,0],cddf95[:,1]))
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
@@ -20,7 +22,7 @@ def do_data_plots(cat, subdir):
     save_figure(path.join(subdir, "cddf_gp"))
     plt.clf()
 
-    (l_N, cddf, cddf68, cddf95) = cat.plot_cddf(zmax=5,color="blue", moment=True)
+    (l_N, cddf, cddf68, cddf95) = cat.plot_cddf(zmax=z_dla_max,color="blue", moment=True)
     plt.xlim(1e20, 1e23)
     plt.legend(loc=0)
     save_figure(path.join(subdir, "cddf_moment_gp"))
@@ -44,7 +46,7 @@ def do_data_plots(cat, subdir):
     #dNdX
     dla_data.dndx_not()
     dla_data.dndx_pro()
-    (z_cent, dNdX, dndx68, dndx95) = cat.plot_line_density(zmax=5)
+    (z_cent, dNdX, dndx68, dndx95) = cat.plot_line_density(zmax=z_dla_max)
     np.savetxt(path.join(subdir,"dndx_all.txt"), (z_cent, dNdX, dndx68[:,0],dndx68[:,1], dndx95[:,0],dndx95[:,1]) )
     plt.legend(loc=0)
     plt.ylim(0,0.16)
@@ -55,7 +57,7 @@ def do_data_plots(cat, subdir):
     dla_data.omegahi_not()
     dla_data.omegahi_pro()
     dla_data.crighton_omega()
-    (z_cent, omega_dla, omega_dla_68, omega_dla_95) = cat.plot_omega_dla(zmax=5)
+    (z_cent, omega_dla, omega_dla_68, omega_dla_95) = cat.plot_omega_dla(zmax=z_dla_max)
 #     cat.tophat_prior = True
 #     cat.plot_omega_dla(zmax=5, label="Tophat Prior", twosigma=False)
 #     cat.tophat_prior = False
@@ -66,67 +68,67 @@ def do_data_plots(cat, subdir):
     save_figure(path.join(subdir,"omega_gp"))
     plt.clf()
 
-def do_sample_error_check(cat, subdir):
+def do_sample_error_check(cat, subdir, z_dla_max = 5):
     """Do a bunch of resamplings to check the effect of sample variance."""
     #dNdX/Omega_DLA
-    cat.plot_dndx_sample_errors(z_max=5,nsample=13)
+    cat.plot_dndx_sample_errors(z_max=z_dla_max,nsample=13)
     plt.legend(loc=0)
     plt.ylim(0,0.16)
     save_figure(path.join(subdir,"dndx_gp_resample"))
     plt.clf()
-    cat.plot_omega_sample_errors(z_max=5,nsample=13)
+    cat.plot_omega_sample_errors(z_max=z_dla_max,nsample=13)
     plt.legend(loc=0)
     plt.ylim(0,2.5)
     save_figure(path.join(subdir,"omega_gp_resample"))
     plt.clf()
 
-def do_check_p_thresh(cat, subdir):
+def do_check_p_thresh(cat, subdir, z_dla_max = 5):
     """Check the effect of very unlikely samples"""
     cat.p_thresh_sample = 1e-4
-    cat.plot_line_density(zmax=5, label=r"$p_\mathrm{sample} = 10^{-4}$")
+    cat.plot_line_density(zmax=z_dla_max, label=r"$p_\mathrm{sample} = 10^{-4}$")
     cat.p_thresh_sample = 1e-2
-    cat.plot_line_density(zmax=5, label=r"$p_\mathrm{sample} = 10^{-2}$")
+    cat.plot_line_density(zmax=z_dla_max, label=r"$p_\mathrm{sample} = 10^{-2}$")
     cat.p_thresh_sample = 1e-4
     cat.p_thresh_spec = 0.1
-    cat.plot_line_density(zmax=5, label=r"$p_\mathrm{spec} = 10^{-1}$")
+    cat.plot_line_density(zmax=z_dla_max, label=r"$p_\mathrm{spec} = 10^{-1}$")
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_p_thresh"))
     plt.clf()
 
-def do_pixel_noise_check(cat, subdir):
+def do_pixel_noise_check(cat, subdir, z_dla_max = 5):
     """Check effect of removing spectra with a low SNR."""
     cat.set_snr(1)
     nt = cat.noise_thresh
     cat.filter_noisy_pixels = True
-    cat.plot_omega_dla(zmax=5,label="N < 0.5")
+    cat.plot_omega_dla(zmax=z_dla_max,label="N < 0.5")
     cat.noise_thresh = 1.
-    cat.plot_omega_dla(zmax=5,label="N < 1")
+    cat.plot_omega_dla(zmax=z_dla_max,label="N < 1")
     cat.noise_thresh = 0.25**2
-    cat.plot_omega_dla(zmax=5,label="N < 0.25")
+    cat.plot_omega_dla(zmax=z_dla_max,label="N < 0.25")
     plt.legend(loc=0)
     save_figure(path.join(subdir,"omega_gp_pix_noise"))
     plt.clf()
 
-    cat.plot_line_density(zmax=5,label="N < 0.5")
+    cat.plot_line_density(zmax=z_dla_max,label="N < 0.5")
     cat.noise_thresh = 1.
-    cat.plot_line_density(zmax=5,label="N < 1")
+    cat.plot_line_density(zmax=z_dla_max,label="N < 1")
     cat.noise_thresh = 0.25**2
-    cat.plot_line_density(zmax=5,label="N < 0.25")
+    cat.plot_line_density(zmax=z_dla_max,label="N < 0.25")
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_gp_pix_noise"))
     plt.clf()
     cat.noise_thresh = nt
     cat.filter_noisy_pixels = False
 
-def do_snr_check(cat, subdir):
+def do_snr_check(cat, subdir, z_dla_max = 5):
     """Check effect of removing spectra with a low SNR."""
     first_snr = cat.snr_thresh
     cat.set_snr(-2)
-    cat.plot_omega_dla(zmax=5,label="All GP")
+    cat.plot_omega_dla(zmax=z_dla_max,label="All GP")
     cat.set_snr(2)
-    cat.plot_omega_dla(zmax=5,label="SNR > 2")
+    cat.plot_omega_dla(zmax=z_dla_max,label="SNR > 2")
     cat.set_snr(4)
-    cat.plot_omega_dla(zmax=5,label="SNR > 4")
+    cat.plot_omega_dla(zmax=z_dla_max,label="SNR > 4")
 #     cat.set_snr(8)
 #     cat.plot_omega_dla(zmax=5,label="SNR > 8")
     plt.legend(loc=0)
@@ -134,11 +136,11 @@ def do_snr_check(cat, subdir):
     plt.clf()
 
     cat.set_snr(-2)
-    cat.plot_line_density(zmax=5, label="All GP")
+    cat.plot_line_density(zmax=z_dla_max, label="All GP")
     cat.set_snr(2)
-    cat.plot_line_density(zmax=5, label="SNR > 2")
+    cat.plot_line_density(zmax=z_dla_max, label="SNR > 2")
     cat.set_snr(4)
-    cat.plot_line_density(zmax=5, label="SNR > 4")
+    cat.plot_line_density(zmax=z_dla_max, label="SNR > 4")
 #     cat.set_snr(8)
 #     cat.plot_line_density(zmax=5, label="SNR > 8")
     plt.legend(loc=0)
@@ -146,65 +148,66 @@ def do_snr_check(cat, subdir):
     plt.clf()
     cat.set_snr(first_snr)
 
-def do_lowzcut_check(cat, subdir):
+def do_lowzcut_check(cat, subdir, z_dla_max = 5):
     """Check effect of the low-z cut."""
     lowzcut = cat.lowzcut
     cat.lowzcut = True
-    cat.plot_omega_dla(zmax=5,label="Cutting")
+    cat.plot_omega_dla(zmax=z_dla_max,label="Cutting")
     cat.lowzcut = False
-    cat.plot_omega_dla(zmax=5,label="Not cutting")
+    cat.plot_omega_dla(zmax=z_dla_max,label="Not cutting")
     plt.legend(loc=0)
     save_figure(path.join(subdir,"omega_gp_lowz"))
     plt.clf()
 
     cat.lowzcut = True
-    cat.plot_line_density(zmax=5,label="Cutting")
+    cat.plot_line_density(zmax=z_dla_max,label="Cutting")
     cat.lowzcut = False
-    cat.plot_line_density(zmax=5,label="Not cutting")
+    cat.plot_line_density(zmax=z_dla_max,label="Not cutting")
     plt.ylim(0,0.12)
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_gp_lowz"))
     plt.clf()
     cat.lowzcut = lowzcut
 
-def do_2dla_plots(cat, subdir):
+def do_2dla_plots(cat, subdir, z_dla_max = 5):
     """Check the effect of a second DLA. No longer included in catalogue"""
     #Omega_DLA in variance vs bayesian mode
     cat.second_dla=False
-    cat.plot_omega_dla(zmax=5, label="Confidence interval")
+    cat.plot_omega_dla(zmax=z_dla_max, label="Confidence interval")
     cat.second_dla=True
-    cat.plot_omega_dla_var(zmax=5, label="Variance")
+    cat.plot_omega_dla_var(zmax=z_dla_max, label="Variance")
     plt.legend(loc=0)
     save_figure(path.join(subdir,"omega_gp_diff"))
     plt.clf()
 
     #dNdX
     #Check effect of the second DLA
-    cat.plot_line_density(zmax=5,label="Two-DLA")
+    cat.plot_line_density(zmax=z_dla_max,label="Two-DLA")
     cat.second_dla = False
-    cat.plot_line_density(zmax=5,label="One-DLA")
+    cat.plot_line_density(zmax=z_dla_max,label="One-DLA")
     cat.second_dla = True
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_2dla"))
     plt.clf()
 
-    cat.plot_omega_dla(zmax=5,label="Two-DLA")
+    cat.plot_omega_dla(zmax=z_dla_max,label="Two-DLA")
     cat.second_dla = False
-    cat.plot_omega_dla(zmax=5,label="One-DLA")
+    cat.plot_omega_dla(zmax=z_dla_max,label="One-DLA")
     cat.second_dla = True
     plt.legend(loc=0)
     save_figure(path.join(subdir,"omega_2dla"))
     plt.clf()
 
-def do_qso_split(cat, subdir):
+def do_qso_split(cat, subdir, z_dla_max = 5.0):
     """Check the effect of the quasar redshift."""
     #Check z_qso split
     oldcond = cat.condition
     high_z = (2.5,3.0,3.5,5.0)
     low_z = (2.0,2.5,3.0,3.5)
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
+        # here should actually use cat.z_qsos, since there is 3000 km/s difference z_qso and z_max
         cat.condition = (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
-        cat.plot_omega_dla(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$")
+        cat.plot_omega_dla(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$", zmax=z_dla_max)
     plt.ylim(ymin=0)
     plt.legend(loc=0)
     save_figure(path.join(subdir,"omega_gp_zqso"+str(cat.lowzcut)))
@@ -212,14 +215,14 @@ def do_qso_split(cat, subdir):
 
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
         cat.condition = (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
-        cat.plot_line_density(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$")
+        cat.plot_line_density(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$", zmax=z_dla_max)
     plt.ylim(ymin=0,ymax=0.15)
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_gp_zqso"+str(cat.lowzcut)))
     plt.clf()
     cat.condition = oldcond
 
-def do_length_split(cat, subdir):
+def do_length_split(cat, subdir, z_dla_max = 5):
     """Check the effect of the quasar redshift."""
     #Check z_qso split
     oldcond = cat.condition
@@ -228,7 +231,7 @@ def do_length_split(cat, subdir):
     z_diff = cat.z_max() - cat.z_min()
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
         cat.condition = (z_diff < high_z_qso)*(z_diff > z_qso_split)
-        cat.plot_omega_dla(label=str(high_z_qso)+" > zQSO > "+str(z_qso_split))
+        cat.plot_omega_dla(label=str(high_z_qso)+" > zQSO > "+str(z_qso_split), zmax=z_dla_max)
     plt.ylim(ymin=0)
     plt.legend(loc=0)
     save_figure(path.join(subdir,"omega_gp_zdiff"))
@@ -236,26 +239,26 @@ def do_length_split(cat, subdir):
 
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
         cat.condition = (z_diff < high_z_qso)*(z_diff > z_qso_split)
-        cat.plot_line_density(label=str(high_z_qso)+" > zQSO > "+str(z_qso_split))
+        cat.plot_line_density(label=str(high_z_qso)+" > zQSO > "+str(z_qso_split), zmax=z_dla_max)
     plt.ylim(ymin=0,ymax=0.1)
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_gp_zdiff"))
     plt.clf()
     cat.condition = oldcond
 
-def do_compare_plots(cat7, cat7s, subdir,label):
+def do_compare_plots(cat7, cat7s, subdir,label, z_dla_max = 5):
     """Plots to compare two cddfs"""
     #Check the effect of the 5km/s split
     #dNdX
-    cat7.plot_line_density(zmax=5)
-    cat7s.plot_line_density(zmax=5, label=label)
+    cat7.plot_line_density(zmax=z_dla_max)
+    cat7s.plot_line_density(zmax=z_dla_max, label=label)
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_"+label))
     plt.clf()
 
     #Omega_DLA
-    cat7.plot_cddf(zmax=4,color="blue")
-    cat7s.plot_cddf(zmax=4,color="red",label=label)
+    cat7.plot_cddf(zmax=z_dla_max,color="blue")
+    cat7s.plot_cddf(zmax=z_dla_max,color="red",label=label)
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
@@ -263,11 +266,34 @@ def do_compare_plots(cat7, cat7s, subdir,label):
     plt.clf()
 
     #Omega_DLA
-    cat7.plot_omega_dla(zmax=5)
-    cat7s.plot_omega_dla(zmax=5, label=label)
+    cat7.plot_omega_dla(zmax=z_dla_max)
+    cat7s.plot_omega_dla(zmax=z_dla_max, label=label)
     plt.legend(loc=0)
     save_figure(path.join(subdir,"omega_"+label))
     plt.clf()
+
+def do_dla_statistics_plots(
+    cat12: calc_cddf.DLACatalogue,
+    subdir: str,
+    z_dla_max: float = 4.75,
+    high_z_qso: float = 4.75,
+    low_z_qso: float = 2,
+):
+    """
+    Do the plotting for CDDF, dN/dX, OmegaDLA,
+    including zQSO splitting checks, snr checks, and lowz cut checks.
+    """
+    oldcond = cat12.condition
+
+    # instead of using z_map like sbird's original code, I use z_qsos
+    cat12.condition = (cat12.z_qsos < high_z_qso) * (cat12.z_qsos > low_z_qso)
+
+    do_data_plots(cat12, subdir, z_dla_max=z_dla_max)
+    do_qso_split(cat12, subdir, z_dla_max=z_dla_max)
+    do_snr_check(cat12, subdir, z_dla_max=z_dla_max)
+    do_lowzcut_check(cat12, subdir, z_dla_max=z_dla_max)
+
+    cat12.condition = oldcond
 
 if __name__=="__main__":
     #DR7 data

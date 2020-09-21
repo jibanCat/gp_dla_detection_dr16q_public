@@ -23,6 +23,7 @@ NaN in any of log_priors_dla, log_likelihoods_no_dla and log_likelihoods_dla mea
 (NOT that there is zero probability of a DLA)
 This is about half the sample of spectra.
 """
+from typing import Optional
 
 import math
 #Complex number
@@ -67,11 +68,16 @@ class DLACatalogue(object):
             computed by `p_dla := 1 - p_no_dla` or `p_dla := 1 - p_no_dla - p_sub_dla`
         `log_norm_like_cache` (dict{np.ndarray}): cache normed `sample_log_likelihoods_dla`,
             p(D|M,zqso,θ) / p(M|zqso,D) / num_dla_samples
-
+        `max_z_dla_fix` (optional float): if float, then re-calculate the max_z_dla. This is
+            due to previous version of the MATLAB code used max(lambda)/lya_wavelength as
+            zQSO. This would be wrong if we load SDSS spectra more than 1216A. So with this
+            flag we cut all zDLA larger than zQSO.
     """
     def __init__(self, processed_file = "processed_qsos_dr7q.mat", sample_file = "dla_samples.mat",
             raw_file = "preloaded_qsos_dr7.mat", snrs_file = "snrs_qsos_dr7.mat",
-            snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000):
+            catalog_file = "catalog.mat",
+            snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000,
+            z_dla_minimum: float = 0.1):
         #Should we include the second DLA?
         self.second_dla = second # False or 0: DLA(1); True or 1: DLA(2); 2: DLA(3); ...; k-1: DLA(k)
 
@@ -83,6 +89,10 @@ class DLACatalogue(object):
         # the Occam's implementation for different DLA models is in self._log_norm_like
         # the additional Occam's razor implementation is in self.renormalise_occams_razor
         self.occams_razor = occams_razor
+
+        # [min_z_dla] the minimum requirement for the sampling range of zDLA;
+        # sometimes the sampling range is too small.
+        self.z_dla_minimum = z_dla_minimum
 
         #Spectra with a DLA probability below this value are assumed to have p = 0, as an optimization.
         #Can be set as high as 0.1 without changing results much.
@@ -98,6 +108,7 @@ class DLACatalogue(object):
         self.proximity_zone = 0.1
         self.raw_file = raw_file
         self.processed_file = processed_file
+        self.catalog_file = catalog_file
         self.tophat_prior = False
 
         #Load data from the file
@@ -106,10 +117,29 @@ class DLACatalogue(object):
         self._z_min = self.filehandle["min_z_dlas"][0]
         self._z_max = self.filehandle["max_z_dlas"][0]
 
-        #Get z_qsos by adding `max_z_cut` back to `max_z_dlas`
-        # .. note:: defined in `set_parameters.m`, max_z_dla := z_qso - max_z_cut
-        #   where max_z_cut := kms_to_z(3000)
-        self.z_qsos = self._z_max + kms_to_z(3000)
+        self.test_ind = self.filehandle["test_ind"][0, :].astype(np.bool)
+
+        # # [max zDLA bug fix] replace the max lambda to zQSO. Assgin max lambda in below
+        # self.max_z_dla_fix = max_z_dla_fix
+        # if max_z_dla_fix:
+        #     z_max = (1 / (self.max_z_dla_fix / lya_wavelength)) * (
+        #         1 + self._z_max + kms_to_z(3000)
+        #     ) - 1 - kms_to_z(3000)
+        #     self._z_max = z_max
+
+        # #Get z_qsos by adding `max_z_cut` back to `max_z_dlas`
+        # # .. note:: defined in `set_parameters.m`, max_z_dla := z_qso - max_z_cut
+        # #   where max_z_cut := kms_to_z(3000)
+        # self.z_qsos = self._z_max + kms_to_z(3000)
+
+        # [max_z_dlas] it is safer to get zQSO directly from the catalog
+        catalog = h5py.File(catalog_file, 'r')
+        z_qsos = catalog['z_qsos'][0, :]
+        self.z_qsos = z_qsos[self.test_ind]
+        assert self.z_qsos.shape[0] == self._z_max.shape[0]
+        # assert np.abs(self.z_qsos - (self._z_max + kms_to_z(3000))) < 1e-3
+        # the bug fix: could be removed in the future
+        self._z_max = self.z_qsos - kms_to_z(3000)
 
         #Index of each spectrum in the file containing the flux: raw_file
         #It's the indices we selected from `preloaded_qsos.mat` based on our `test_ind`
@@ -178,8 +208,7 @@ class DLACatalogue(object):
         self.p_dla    = self.model_posteriors[:, 1+self.sub_dla:].sum(axis=1)
         self.p_no_dla = self.model_posteriors[:, :1+self.sub_dla].sum(axis=1)
 
-    @staticmethod
-    def _occams_model_posteriors(model_posteriors, occams_razor=10000):
+    def _occams_model_posteriors(self, model_posteriors, occams_razor=10000):
         '''
         re-calculate the model posteriors based on an additional occams_razor penalty
 
@@ -199,7 +228,11 @@ class DLACatalogue(object):
 
         model_posteriors = model_posteriors / normalisation
 
-        assert np.all( (0.8 < np.sum(model_posteriors, axis=1)) & (np.sum(model_posteriors, axis=1) < 1.2))
+        # [condition] filter out NaN p_dlas
+        condition = ~np.isnan(np.sum(model_posteriors, axis=1))
+        self.condition = self.condition * condition
+
+        assert np.all(((0.8 < np.sum(model_posteriors, axis=1)) * (np.sum(model_posteriors, axis=1) < 1.2))[condition])
         return model_posteriors
 
     def get_first_dla_attrs(self):
@@ -481,6 +514,7 @@ class DLACatalogue(object):
         """
         inds_p_thresh   = (self._p_dla(second=second) > self.p_thresh_spec)
         inds_snr_thresh = self._filter_snr_spectra()
+        ind_z_dlas      = self._filter_z_dlas(self.z_dla_minimum)
 
         # select snrs with the same length as p_dla because it is possible we are running on a truncated file
         if len(inds_p_thresh) != len(inds_snr_thresh):
@@ -488,7 +522,7 @@ class DLACatalogue(object):
                 len(inds_p_thresh), len(inds_snr_thresh)))
             inds_snr_thresh = inds_snr_thresh[:len(inds_p_thresh)]
 
-        return np.where( inds_p_thresh * inds_snr_thresh )
+        return np.where( inds_p_thresh * inds_snr_thresh * ind_z_dlas )
 
     def _filter_snr_spectra(self):
         """Helper function to get SNR mask."""
@@ -512,6 +546,14 @@ class DLACatalogue(object):
     def set_snr(self, snr_thresh):
         """Set the value of SNR to be used, loading the SNR array if needed"""
         self.snr_thresh = snr_thresh
+
+    def _filter_z_dlas(self, z_dla_minimum: float = 0.1):
+        """Filter out the spectra without enough sampling in zDLAs."""
+        return ((self._z_max - self._z_min) > z_dla_minimum) * self.condition
+
+    def filter_z_dlas(self, z_dla_minimum: float = 0.1):
+        """Filter out the spectra without enough sampling in zDLAs."""
+        return np.where(self._filter_z_dlas(z_dla_minimum))
 
     def _p_dla(self, *, second=False):
         """Get the probability of a DLA. If second=False, return the probabilities of at least one DLA in each spectrum.
@@ -562,7 +604,7 @@ class DLACatalogue(object):
         assert z_min < z_max
         #Make a clean copy
         #Filter spectra that don't make the SNR cut
-        ind = self.filter_snr_spectra()
+        ind = self._filter_snr_spectra() * self._filter_z_dlas(self.z_dla_minimum)
         max_z_dlas = np.array(self.z_max())[ind]
         min_z_dlas = np.array(self.z_min())[ind]
         #Increase the minimum redshift to remove spectra contaminated by the lyman beta forest.

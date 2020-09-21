@@ -19,7 +19,7 @@ observed_wavelengths = ...
 
 % file loading parameters
 loading_min_lambda = 910;                     % range of rest wavelengths to load  Å
-loading_max_lambda = 1217;
+loading_max_lambda = 1310;
 
 % preprocessing parameters
 z_qso_cut      = 2.15;                        % filter out QSOs with z less than this threshold
@@ -31,7 +31,7 @@ normalization_max_lambda = 1325;              %   for flux normalization
 
 % null model parameters
 min_lambda         =  911.75;                 % range of rest wavelengths to       Å
-max_lambda         = 1215.75;                 %   model
+max_lambda         = 1300.75;                 %   model
 dlambda            =    0.25;                 % separation of wavelength grid      Å
 k                  = 20;                      % rank of non-diagonal contribution
 max_noise_variance = 3^2;                     % maximum pixel noise allowed during model training
@@ -64,7 +64,8 @@ num_lines = 3;                                % number of members of the Lyman s
 
 max_z_cut = kms_to_z(3000);                   % max z_DLA = z_QSO - max_z_cut
 max_z_dla = @(wavelengths, z_qso) ...         % determines maximum z_DLA to search
-    (max(wavelengths) / lya_wavelength - 1) - max_z_cut;
+    min((max(wavelengths) / lya_wavelength - 1) - max_z_cut, ...
+        z_qso - max_z_cut);
 
 min_z_cut = kms_to_z(3000);                   % min z_DLA = z_Ly∞ + min_z_cut
 min_z_dla = @(wavelengths, z_qso) ...         % determines minimum z_DLA to search
@@ -161,4 +162,4 @@ dla_catalog_directory = @(name) ...
     sprintf('%s/dla_catalogs/%s/processed', base_directory, name);
 
 % replace with @(varargin) (fprintf(varargin{:})) to show debug statements
-fprintf_debug = @(varargin) ([]);
+fprintf_debug = @(varargin) (fprintf(varargin{:}));
