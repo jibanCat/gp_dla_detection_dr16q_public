@@ -77,7 +77,7 @@ class DLACatalogue(object):
             raw_file = "preloaded_qsos_dr7.mat", snrs_file = "snrs_qsos_dr7.mat",
             catalog_file = "catalog.mat",
             snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000,
-            z_dla_minimum: float = 1.5):
+            z_dla_minimum: float = 0.1):
         #Should we include the second DLA?
         self.second_dla = second # False or 0: DLA(1); True or 1: DLA(2); 2: DLA(3); ...; k-1: DLA(k)
 
@@ -547,11 +547,11 @@ class DLACatalogue(object):
         """Set the value of SNR to be used, loading the SNR array if needed"""
         self.snr_thresh = snr_thresh
 
-    def _filter_z_dlas(self, z_dla_minimum: float = 0.15):
+    def _filter_z_dlas(self, z_dla_minimum: float = 0.1):
         """Filter out the spectra without enough sampling in zDLAs."""
         return ((self._z_max - self._z_min) > z_dla_minimum) * self.condition
 
-    def filter_z_dlas(self, z_dla_minimum: float = 0.15):
+    def filter_z_dlas(self, z_dla_minimum: float = 0.1):
         """Filter out the spectra without enough sampling in zDLAs."""
         return np.where(self._filter_z_dlas(z_dla_minimum))
 
