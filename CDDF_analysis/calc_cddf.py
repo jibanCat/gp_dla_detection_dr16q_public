@@ -77,7 +77,7 @@ class DLACatalogue(object):
             raw_file = "preloaded_qsos_dr7.mat", snrs_file = "snrs_qsos_dr7.mat",
             catalog_file = "catalog.mat",
             snr = -2, lowzcut=False, second=False, sub_dla=False, occams_razor=10000,
-            z_dla_minimum: float = 1.5):
+            z_dla_minimum: float = 0.1):
         #Should we include the second DLA?
         self.second_dla = second # False or 0: DLA(1); True or 1: DLA(2); 2: DLA(3); ...; k-1: DLA(k)
 
@@ -208,8 +208,7 @@ class DLACatalogue(object):
         self.p_dla    = self.model_posteriors[:, 1+self.sub_dla:].sum(axis=1)
         self.p_no_dla = self.model_posteriors[:, :1+self.sub_dla].sum(axis=1)
 
-    @staticmethod
-    def _occams_model_posteriors(model_posteriors, occams_razor=10000):
+    def _occams_model_posteriors(self, model_posteriors, occams_razor=10000):
         '''
         re-calculate the model posteriors based on an additional occams_razor penalty
 
@@ -229,7 +228,11 @@ class DLACatalogue(object):
 
         model_posteriors = model_posteriors / normalisation
 
-        assert np.all( (0.8 < np.sum(model_posteriors, axis=1)) & (np.sum(model_posteriors, axis=1) < 1.2))
+        # [condition] filter out NaN p_dlas
+        condition = ~np.isnan(np.sum(model_posteriors, axis=1))
+        self.condition = self.condition * condition
+
+        assert np.all(((0.8 < np.sum(model_posteriors, axis=1)) * (np.sum(model_posteriors, axis=1) < 1.2))[condition])
         return model_posteriors
 
     def get_first_dla_attrs(self):
@@ -544,11 +547,11 @@ class DLACatalogue(object):
         """Set the value of SNR to be used, loading the SNR array if needed"""
         self.snr_thresh = snr_thresh
 
-    def _filter_z_dlas(self, z_dla_minimum: float = 0.15):
+    def _filter_z_dlas(self, z_dla_minimum: float = 0.1):
         """Filter out the spectra without enough sampling in zDLAs."""
         return ((self._z_max - self._z_min) > z_dla_minimum) * self.condition
 
-    def filter_z_dlas(self, z_dla_minimum: float = 0.15):
+    def filter_z_dlas(self, z_dla_minimum: float = 0.1):
         """Filter out the spectra without enough sampling in zDLAs."""
         return np.where(self._filter_z_dlas(z_dla_minimum))
 
