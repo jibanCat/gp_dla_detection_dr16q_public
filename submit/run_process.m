@@ -31,8 +31,8 @@ for i = qso_start_ind:qso_end_ind
         ' prior_catalog.los_inds(dla_catalog_name)'];
 
     % specify the spectra to process
-    release = 'dr14q';
-    test_set_name = 'dr14q';
+    release = 'dr16q';
+    test_set_name = 'dr16q';
     test_ind = '(catalog.filter_flags == 0)';
 
     % set lls parameters

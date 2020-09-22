@@ -2,7 +2,8 @@
 
 cd ..
 
-addpath multi_dlas
+addpath multi_dlas/
+addpath dr16q/
 
 set_parameters_multi;
-build_catalogs_dr14q;
+build_catalogs_dr16q;
