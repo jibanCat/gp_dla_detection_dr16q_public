@@ -27,10 +27,11 @@ thing_ids        =  dr16_catalog{16};
 plates           =  dr16_catalog{4};
 mjds             =  dr16_catalog{5};
 fiber_ids        =  dr16_catalog{6};
-z_qsos           =  dr16_catalog{27}; % Best available redshift taken from Z VI, Z PIPE, Z DR12Q, Z DR7Q SCH, or Z DR6Q HW
+z_qsos           =  dr16_catalog{27};         % Best available redshift taken from
+                                              % Z VI, Z PIPE, Z DR12Q, Z DR7Q SCH, or Z DR6Q HW
 zwarning         =  dr16_catalog{30};
-% snrs             =  dr16_catalog{46}; % no SNR in dr16q
 bal_visual_flags = (dr16_catalog{57} > 0.75); % 99,856 spectra with BAL PROB ≥ 0.75
+is_qso_dr12q     =  dr16_catalog{21};         % Flag indicating if an object was a quasar in DR12Q
 
 num_quasars = numel(z_qsos);
 
@@ -47,6 +48,8 @@ unique_ids_dr12q = convert_unique_id(plates_dr12q, mjds_dr12q, fiber_ids_dr12q);
 % determine which objects in DR16Q are in DR12Q, using spec IDs
 in_dr12 = ismember(unique_ids,       unique_ids_dr12q);
 in_dr16 = ismember(unique_ids_dr12q, unique_ids);
+% make sure matching specIDs gives the same result as using eBOSS's flag
+assert(sum(in_dr12) == sum(is_qso_dr12q == 1))
 
 [num_dr16q, ~] = size(in_dr12);
 
@@ -57,6 +60,11 @@ assert(sum(in_dr12) == sum(in_dr16))
 % The DLA flags could be different if the zQSOs are different.
 delta_z_qsos = abs(z_qsos(in_dr12) - z_qsos_dr12q(in_dr16));
 z_qso_diff_in_dr12 = (delta_z_qsos < 1e-2); % saved for learning script
+% create another in_dr12 to avoid zQSO difference
+in_dr12_z = false(num_quasars, 1);
+in_dr12_z(in_dr12) = z_qso_diff_in_dr12;
+
+assert(sum(in_dr12_z) == sum(z_qso_diff_in_dr12))
 
 % to track reasons for filtering out QSOs
 filter_flags = zeros(num_quasars, 1, 'uint8');
