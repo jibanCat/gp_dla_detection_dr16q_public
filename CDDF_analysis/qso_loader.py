@@ -132,26 +132,11 @@ class QSOLoader(object):
         self.z_qsos = self.z_qsos[self.test_ind]
         # self.snrs_cat   = self.snrs_cat[self.test_ind]
 
-        # [Occams Razor] Update model posteriors with an additional occam's razor
-        # updating: 1) model_posteriors, p_dlas, p_no_dlas
-        self.model_posteriors = self._occams_model_posteriors(self.model_posteriors, self.occams_razor)
-        self.p_dlas    = self.model_posteriors[:, 1+self.sub_dla:].sum(axis=1)
-        self.p_no_dlas = self.model_posteriors[:, :1+self.sub_dla].sum(axis=1)
-
-        # build a MAP number of DLAs array
-        # construct a reference array of model_posteriors in Roman's catalogue for computing ROC curve
-        multi_p_dlas    = self.model_posteriors # shape : (num_qsos, 2 + num_dlas)
-
-        dla_map_model_index = np.argmax( multi_p_dlas, axis=1 )
-        multi_p_dlas = multi_p_dlas[ np.arange(multi_p_dlas.shape[0]), dla_map_model_index ]
-
         # remove all NaN slices from our sample
-        nan_inds = np.isnan( multi_p_dlas )
+        nan_inds = np.isnan( self.p_dlas )
 
         self.test_ind[self.test_ind == True] = ~nan_inds
 
-        multi_p_dlas          = multi_p_dlas[~nan_inds]
-        dla_map_model_index   = dla_map_model_index[~nan_inds]
         self.test_real_index  = self.test_real_index[~nan_inds]
         self.model_posteriors = self.model_posteriors[~nan_inds, :]
         self.p_dlas           = self.p_dlas[~nan_inds]
@@ -171,6 +156,20 @@ class QSOLoader(object):
         self.log_priors_dla   = self.log_priors_dla[~nan_inds]
 
         self.nan_inds = nan_inds
+
+        # [Occams Razor] Update model posteriors with an additional occam's razor
+        # updating: 1) model_posteriors, p_dlas, p_no_dlas
+        self.model_posteriors = self._occams_model_posteriors(self.model_posteriors, self.occams_razor)
+        self.p_dlas    = self.model_posteriors[:, 1+self.sub_dla:].sum(axis=1)
+        self.p_no_dlas = self.model_posteriors[:, :1+self.sub_dla].sum(axis=1)
+
+        # build a MAP number of DLAs array
+        # construct a reference array of model_posteriors in Roman's catalogue for computing ROC curve
+        multi_p_dlas    = self.model_posteriors # shape : (num_qsos, 2 + num_dlas)
+
+        dla_map_model_index = np.argmax( multi_p_dlas, axis=1 )
+        multi_p_dlas = multi_p_dlas[ np.arange(multi_p_dlas.shape[0]), dla_map_model_index ]
+
         assert np.any( np.isnan( multi_p_dlas )) == False
 
         # get the number of DLAs with the highest val in model_posteriors
@@ -1806,8 +1805,8 @@ class QSOLoader(object):
             indicator = (this_lyman_1pzs <= (1 + z_qso)).astype(np.float)
 
             # avoid the z_qso != max(z_lya) problem
-            if i != 0:
-                this_lyman_1pzs = this_lyman_1pzs * indicator
+            # if i != 0:
+            this_lyman_1pzs = this_lyman_1pzs * indicator
 
             # scale the optical depth from Kim (2007) prior
             this_tau = tau_lyseries(
