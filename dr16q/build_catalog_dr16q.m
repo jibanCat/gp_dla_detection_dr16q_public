@@ -3,17 +3,12 @@
 %
 % ZWARNING: ensure we exclude those spectra with bad redshift status reported
 
+% spec ID in integer : plates * 10**9 + mjds * 10**4 + fiber_ids
+% Note: thingIDs between DR16Q and DR12Q are unmatched, but specID are matched. 
+convert_unique_id = @(plate, mjd, fiber_id) ...
+  (uint64(plate) * 10^9 + uint64(mjd) * 10^4 + uint64(fiber_id));
+
 % load QSO catalogs
-release = 'dr9q';
-dr9_catalog = ...
-    fitsread(sprintf('%s/DR9Q.fits', distfiles_directory(release)), ...
-             'binarytable');
-
-release = 'dr10q';
-dr10_catalog = ...
-    fitsread(sprintf('%s/DR10Q_v2.fits', distfiles_directory(release)), ...
-             'binarytable');
-
 release = 'dr12q';
 dr12_catalog = ...
     fitsread(sprintf('%s/DR12Q.fits', distfiles_directory(release)), ...
@@ -24,7 +19,7 @@ dr16_catalog = ...
   fitsread(sprintf('%s/DR16Q_v4.fits', distfiles_directory(release)), ...
               'binarytable');
 
-% extract basic QSO information from DR12Q catalog
+% extract basic QSO information from DR16Q catalog
 sdss_names       =  dr16_catalog{1};
 ras              =  dr16_catalog{2};
 decs             =  dr16_catalog{3};
@@ -39,11 +34,29 @@ bal_visual_flags = (dr16_catalog{57} > 0.75); % 99,856 spectra with BAL PROB ≥
 
 num_quasars = numel(z_qsos);
 
-% determine which objects in DR12Q are in DR10Q and DR9Q, using SDSS
-% thing IDs
-in_dr9  = ismember(thing_ids,  dr9_catalog{4});
-in_dr10 = ismember(thing_ids, dr10_catalog{4});
-in_dr12 = ismember(thing_ids, dr12_catalog{4});
+% extract basic QSO information from DR12Q catalog
+plates_dr12q           =  dr12_catalog{5};
+mjds_dr12q             =  dr12_catalog{6};
+fiber_ids_dr12q        =  dr12_catalog{7};
+z_qsos_dr12q           =  dr12_catalog{8};
+
+% [match DR12Q and DR16Q] make unique IDs
+unique_ids       = convert_unique_id(plates,       mjds,       fiber_ids);
+unique_ids_dr12q = convert_unique_id(plates_dr12q, mjds_dr12q, fiber_ids_dr12q);
+
+% determine which objects in DR16Q are in DR12Q, using spec IDs
+in_dr12 = ismember(unique_ids,       unique_ids_dr12q);
+in_dr16 = ismember(unique_ids_dr12q, unique_ids);
+
+[num_dr16q, ~] = size(in_dr12);
+
+assert(num_dr16q == num_quasars)
+assert(sum(in_dr12) == sum(in_dr16))
+
+% [match DR12Q and DR16Q] to be safe, filter out unmatched zQSOs.
+% The DLA flags could be different if the zQSOs are different.
+delta_z_qsos = abs(z_qsos(in_dr12) - z_qsos_dr12q(in_dr16));
+z_qso_diff_in_dr12 = (delta_z_qsos < 1e-2); % saved for learning script
 
 % to track reasons for filtering out QSOs
 filter_flags = zeros(num_quasars, 1, 'uint8');
@@ -69,18 +82,30 @@ z_dlas   = containers.Map();
 log_nhis = containers.Map();
 
 % load available DLA catalogs
-for catalog_name = {'dr9q_concordance', 'dr12q_noterdaeme', 'dr12q_visual'}
+for catalog_name = {'dr12q_gp'}
+  % [train_dr12q] train_ind here to simplicity; move to other file in the future
+  % train all of the spectra in dr12q with p_no_dlas > 0.9
+  training_release = 'dr12q';
+  processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_zwarn_occams_trunc_dr12q', ...
+      processed_directory(training_release)));
+
+  % [test_ind] get all unique IDs from test data from DR12Q
+  test_ind = processed.test_ind;
+  test_unique_ids_dr12q = unique_ids_dr12q(test_ind); 
 
   % determine lines of sight searched in this catalog
-  los_catalog = ...
-      load(sprintf('%s/los_catalog', dla_catalog_directory(catalog_name{:})));
-  los_inds(catalog_name{:}) = ismember(thing_ids, los_catalog);
+  los_inds(catalog_name{:}) = ismember(unique_ids, test_unique_ids_dr12q);
 
-  dla_catalog = ...
-      load(sprintf('%s/dla_catalog', dla_catalog_directory(catalog_name{:})));
+  % [p_dlas] determine DLAs by setting threshold on pDLAs
+  ind = (processed.p_dlas > 0.9);
+  dla_unique_ids = unique_ids_dr12q(test_ind);
+  dla_unique_ids = dla_unique_ids(ind);
+  % DLA paramteres
+  processed_z_dlas   = processed.MAP_z_dlas(ind, 1, 1);
+  processed_log_nhis = processed.MAP_log_nhis(ind, 1, 1);
 
   % determine DLAs flagged in this catalog
-  [dla_inds(catalog_name{:}), ind] = ismember(thing_ids, dla_catalog(:, 1));
+  [dla_inds(catalog_name{:}), ind] = ismember(unique_ids, dla_unique_ids);
   ind = find(ind);
 
   % determine lists of DLA parameters for identified DLAs, when
@@ -88,9 +113,9 @@ for catalog_name = {'dr9q_concordance', 'dr12q_noterdaeme', 'dr12q_visual'}
   this_z_dlas   = cell(num_quasars, 1);
   this_log_nhis = cell(num_quasars, 1);
   for i = 1:numel(ind)
-    this_dla_ind = (dla_catalog(:, 1) == thing_ids(ind(i)));
-    this_z_dlas{ind(i)}   = dla_catalog(this_dla_ind, 2);
-    this_log_nhis{ind(i)} = dla_catalog(this_dla_ind, 3);
+    this_dla_ind = (dla_unique_ids == unique_ids(ind(i)));
+    this_z_dlas{ind(i)}   = processed_z_dlas(this_dla_ind);
+    this_log_nhis{ind(i)} = processed_log_nhis(this_dla_ind);
   end
   z_dlas(  catalog_name{:}) = this_z_dlas;
   log_nhis(catalog_name{:}) = this_log_nhis;
@@ -101,9 +126,10 @@ end
 release = 'dr16q';
 variables_to_save = {'sdss_names', 'ras', 'decs', 'thing_ids', 'plates', ...
                      'mjds', 'fiber_ids', 'z_qsos', ...  %'snrs', ...
-                     'bal_visual_flags', 'in_dr9', 'in_dr10', 'filter_flags', ...
+                     'bal_visual_flags', 'filter_flags', ...
                      'los_inds', 'dla_inds', 'z_dlas', 'log_nhis', ...
-                     'zwarning', 'in_dr12'};
+                     'zwarning', 'in_dr12', 'in_dr16', 'z_qso_diff_in_dr12', ...
+                     'unique_ids', 'unique_ids_dr12q'};
 save(sprintf('%s/catalog', processed_directory(release)), ...
     variables_to_save{:}, '-v7.3');
 
