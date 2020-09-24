@@ -32,6 +32,8 @@ if (ischar(train_ind))
   train_ind = eval(train_ind);
 end
 
+fprintf('Total training set size: %d', sum(train_ind));
+
 % select training vectors
 all_wavelengths    =    all_wavelengths(train_ind, :);
 all_flux           =           all_flux(train_ind, :);
@@ -49,6 +51,11 @@ all_lyman_1pzs       = nan(num_forest_lines, num_quasars, num_rest_pixels);
 rest_fluxes          = nan(num_quasars, num_rest_pixels);
 rest_noise_variances = nan(num_quasars, num_rest_pixels);
 
+% [error handler] the preload_qsos should fliter out empty spectra;
+% this line is to prevent there is any empty spectra
+% in preloaded_qsos.mat for some reason, e.g., unmatched filter_flags.
+is_empty             = false(num_quasars, 1);
+
 % interpolate quasars onto chosen rest wavelength grid
 for i = 1:num_quasars
   z_qso = z_qsos(i);
@@ -61,6 +68,14 @@ for i = 1:num_quasars
   this_flux(this_pixel_mask)           = nan;
   this_noise_variance(this_pixel_mask) = nan;
 
+  % [error handler] in case filter_flags and test_ind not exactly match
+  fprintf('processing quasar %i with lambda_size = %i %i ...\n', i, size(this_wavelengths))
+
+  if all(size(this_wavelengths) == [0 0])
+    is_empty(i, 1) = 1;
+    continue;
+  end
+  
   this_rest_wavelengths = emitted_wavelengths(this_wavelengths, z_qso);
 
   lya_1pzs(i, :) = ...
@@ -68,8 +83,15 @@ for i = 1:num_quasars
               1 + (this_wavelengths - lya_wavelength) / lya_wavelength, ...
               rest_wavelengths);
 
-  % incldue all members in Lyman series to the forest
-  for j = 1:num_forest_lines
+  % this_wavelength is raw wavelength (w/t ind)
+  % so we need an indicator here to comfine lya_1pzs
+  % below Lyman alpha (do we need to make the indicator
+  % has a lower bound at Lyman limit here?)
+  % indicator = lya_1pzs(i, :) <= (1 + z_qso);
+  % lya_1pzs(i, :) = lya_1pzs(i, :) .* indicator;
+
+  % include all members in Lyman series to the forest
+  for j = 1:num_forest_lines  
     this_transition_wavelength = all_transition_wavelengths(j);
 
     all_lyman_1pzs(j, i, :) = ...
@@ -77,12 +99,10 @@ for i = 1:num_quasars
               1 + (this_wavelengths - this_transition_wavelength) / this_transition_wavelength, ... 
               rest_wavelengths);
 
-    if j > 1
-      % indicator function: z absorbers <= z_qso
-      indicator = all_lyman_1pzs(j, i, :) <= (1 + z_qso);
+    % indicator function: z absorbers <= z_qso
+    indicator = all_lyman_1pzs(j, i, :) <= (1 + z_qso);
 
-      all_lyman_1pzs(j, i, :) = all_lyman_1pzs(j, i, :) .* indicator;    
-    end
+    all_lyman_1pzs(j, i, :) = all_lyman_1pzs(j, i, :) .* indicator;    
   end
 
   rest_fluxes(i, :) = ...
@@ -92,6 +112,17 @@ for i = 1:num_quasars
       interp1(this_rest_wavelengths, this_noise_variance, rest_wavelengths);
 end
 clear('all_wavelengths', 'all_flux', 'all_noise_variance', 'all_pixel_mask');
+
+% [error handler] filter out empty spectra
+% note: if you've done this in preload_qsos then skip these lines
+z_qsos               = z_qsos(~is_empty);
+lya_1pzs             = lya_1pzs(~is_empty, :);
+rest_fluxes          = rest_fluxes(~is_empty, :);
+rest_noise_variances = rest_noise_variances(~is_empty, :);
+all_lyman_1pzs       = all_lyman_1pzs(:, ~is_empty, :);
+% update num_quasars in consideration
+num_quasars = numel(z_qsos);
+fprintf('Get rid of empty spectra, num_quasars = %i\n', num_quasars);
 
 % mask noisy pixels
 ind = (rest_noise_variances > max_noise_variance);
@@ -114,7 +145,8 @@ rest_noise_variances_exp1pz = nan(num_quasars, num_rest_pixels);
 
 for i = 1:num_quasars
   % compute the total optical depth from all Lyman series members
-  total_optical_depth = nan(num_forest_lines, num_rest_pixels);
+  % Apr 8: not using NaN here anymore due to range beyond Lya will all be NaNs
+  total_optical_depth = zeros(num_forest_lines, num_rest_pixels);
 
   for j = 1:num_forest_lines
     % calculate the oscillator strengths for Lyman series
@@ -128,7 +160,9 @@ for i = 1:num_quasars
     total_optical_depth(j, :) = this_tau_0 .* (this_lyman_1pzs.^prev_beta);
   end
 
-  lya_absorption = exp(- nansum(total_optical_depth, 1) );
+  % Apr 8: using zeros instead so not nansum here anymore
+  % beyond lya, absorption fcn shoud be unity
+  lya_absorption = exp(- sum(total_optical_depth, 1) );
 
   % We have to reverse the effect of Lyα for both mean-flux and observational noise
   rest_fluxes_div_exp1pz(i, :)      = rest_fluxes(i, :) ./ lya_absorption;
@@ -141,15 +175,30 @@ mu = nanmean(rest_fluxes_div_exp1pz);
 centered_rest_fluxes = bsxfun(@minus, rest_fluxes_div_exp1pz, mu);
 clear('rest_fluxes', 'rest_fluxes_div_exp1pz');
 
+% [PCA NaNs replaced with medians]
+% make the NaNs to the medians of a given row;
+% rememeber not to inject this into the actual
+% joint likelihood maximisation
+pca_centered_rest_flux = centered_rest_fluxes;
+[num_quasars, ~] = size(pca_centered_rest_flux);
+for i = 1:num_quasars
+  this_pca_centered_rest_flux = pca_centered_rest_flux(i, :);
+
+  % assign median value for each row to nan
+  ind = isnan(this_pca_centered_rest_flux);
+
+  pca_centered_rest_flux(i, ind) = nanmedian(this_pca_centered_rest_flux);
+end
+
 % get top-k PCA vectors to initialize M
 [coefficients, ~, latent] = ...
-    pca(centered_rest_fluxes, ...
+    pca(pca_centered_rest_flux, ...
         'numcomponents', k, ...
         'rows',          'complete');
 
 objective_function = @(x) objective_lyseries(x, centered_rest_fluxes, lya_1pzs, ...
         rest_noise_variances_exp1pz, num_forest_lines, all_transition_wavelengths, ...
-        all_oscillator_strengths);
+        all_oscillator_strengths, z_qsos);
 
 % initialize A to top-k PCA components of non-DLA-containing spectra
 initial_M = bsxfun(@times, coefficients(:, 1:k), sqrt(latent(1:k))');
@@ -188,7 +237,8 @@ variables_to_save = {'training_release', 'train_ind', 'max_noise_variance', ...
                      'log_c_0', 'log_tau_0', 'log_beta', 'log_likelihood', ...
                      'minFunc_output'};
 
-save(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s',             ...
+save(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d',             ...
              processed_directory(training_release), ...
-             training_set_name), ...
+             training_set_name, ...
+             int64(min_lambda), int64(max_lambda)), ...
      variables_to_save{:}, '-v7.3');
