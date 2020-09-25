@@ -21,7 +21,7 @@ for i = qso_start_ind:qso_end_ind
     % prior settings
     % specify the learned quasar model to use
     training_release  = 'dr16q';                % where the leanrned file is
-    training_set_name = 'dr12q_minus_gp';
+    training_set_name = 'dr16q_minus_dr12q_gp';
     prior_release     = 'dr12q';                % where the prior catalog and sample files are
 
     % specify the spectra to use for computing the DLA existence prior
