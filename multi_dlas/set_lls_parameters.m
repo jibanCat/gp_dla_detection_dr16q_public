@@ -11,7 +11,7 @@ fit_max_log_nhi     = 22.0;                   % from fit to log PDF
 extrapolate_min_log_nhi = 19.5;               % normalization range for the extrapolated reagion
 
 % load training catalog
-catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
+catalog = load(sprintf('%s/catalog', processed_directory(prior_release)));
 
 % generate quasirandom samples from p(normalized offset, log₁₀(N_HI))
 rng('default');
