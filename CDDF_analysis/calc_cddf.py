@@ -1265,8 +1265,18 @@ def compute_all_snrs(*, raw_file="preloaded_qsos.mat", processed_file="processed
     real_index = np.where(ff["test_ind"][0] != 0)[0]
     min_z_dla = np.array(ff["min_z_dlas"][0])
     max_z_dla = np.array(ff["max_z_dlas"][0])
+
+    # if this is a partial file, take the first min_z_dla.shape[0] index
+    size = min_z_dla.shape[0]
+    if size != real_index.shape[0]:
+        print("[Warning] size preload {} and size processed {} not match, take first {} index.".format(
+            real_index.shape[0], size, size,
+        ))
+    else:
+        size = np.size(real_index)
+
     ff.close()
-    snrs = np.array([find_snr(nn, real_index, raw_file, min_z_dla[nn], max_z_dla[nn]) for nn in range(np.size(real_index))])
+    snrs = np.array([find_snr(nn, real_index, raw_file, min_z_dla[nn], max_z_dla[nn]) for nn in range(size)])
     f = h5py.File(save_file, 'w')
     f["snrs"] = snrs
 #     dt = h5py.special_dtype(vlen=np.dtype('float64'))
