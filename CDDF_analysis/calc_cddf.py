@@ -23,7 +23,7 @@ NaN in any of log_priors_dla, log_likelihoods_no_dla and log_likelihoods_dla mea
 (NOT that there is zero probability of a DLA)
 This is about half the sample of spectra.
 """
-from typing import Optional
+from typing import Optional, Union
 
 import math
 
@@ -36,6 +36,8 @@ import scipy.integrate as integrate
 from scipy.special import logsumexp
 from scipy.stats import poisson
 import matplotlib.pyplot as plt
+from astropy.io import fits
+
 from .set_parameters import *
 
 # prevent cluster session plotting issue
@@ -79,17 +81,19 @@ class DLACatalogue(object):
 
     def __init__(
         self,
-        processed_file="processed_qsos_dr7q.mat",
-        sample_file="dla_samples.mat",
-        raw_file="preloaded_qsos_dr7.mat",
-        snrs_file="snrs_qsos_dr7.mat",
-        catalog_file="catalog.mat",
-        snr=-2,
-        lowzcut=False,
-        second=False,
-        sub_dla=False,
-        occams_razor=10000,
+        processed_file: str = "processed_qsos_multi_meanflux_dr16q.mat",
+        sample_file: str = "dla_samples_a03.mat",
+        raw_file: str = "preloaded_qsos.mat",
+        snrs_file: str = "snrs_qsos_multi_meanflux_dr16q.mat",
+        catalog_file: str = "catalog.mat",
+        snr: int = -2,
+        lowzcut: bool = False,
+        second: Union[int, bool] = False,
+        sub_dla: bool = True,
+        occams_razor: int = 10000,
         z_dla_minimum: float = 0.1,
+        raw_distfile: str = "DR16Q_v4.fits",
+        zestimate_cut: bool = False,
     ):
         # Should we include the second DLA?
         self.second_dla = (
@@ -187,6 +191,38 @@ class DLACatalogue(object):
         self.do_resample = False
         # This allows us to filter by quasar redshift later
         self.condition = np.ones_like(self.z_min, dtype=np.bool)
+
+        # [zestimate_cut] filter out spectra with redshift measurement
+        # disagreements. Only look at "Z", "Z_PCA", "Z_VI", "Z_PIPE"
+        # Note: -1 means no measurements, we should not include those values.
+        if zestimate_cut:
+            delta_z_qso = 1
+
+            self.hdu = fits.open(raw_distfile)
+            # the best redshift measurement column, only in DR16Q
+            z_best = self.hdu[1].data["Z"][self.test_ind]
+
+            # make sure the distfile is the same as the one we used for catalog.mat
+            assert np.all(np.abs(z_best - self.z_qsos) < 1e-3)
+
+            z_pca = self.hdu[1].data["Z_PCA"][self.test_ind]
+            z_pipe = self.hdu[1].data["Z_PIPE"][self.test_ind]
+            z_vi = self.hdu[1].data["Z_VI"][self.test_ind]
+
+            all_z_methods = [z_pca, z_pipe, z_vi]
+            z_condition = np.ones_like(z_best, dtype=np.bool)
+            for z_method in all_z_methods:
+                ind = np.abs(z_best - z_method) < delta_z_qso
+
+                ignore_ind = (z_method == -1)
+                ind[ignore_ind] = True
+
+                z_condition = ind * z_condition
+
+            print("[Info] {} -> {} after filtering out uncertain z measures.".format(
+                np.sum(self.test_ind), np.sum(z_condition)))
+            self.z_condition = z_condition
+            self.condition = self.condition * z_condition
 
         # [Occam's razor] set up model_posteriors attr and put an additional occam's razor
         self.renormalise_occams_razor(occams_razor=self.occams_razor)
