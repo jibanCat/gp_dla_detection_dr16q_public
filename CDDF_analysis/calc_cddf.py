@@ -193,7 +193,7 @@ class DLACatalogue(object):
         self.set_snr(snr)
         self.do_resample = False
         # This allows us to filter by quasar redshift later
-        self.condition = np.ones_like(self.z_min, dtype=np.bool)
+        self.condition = np.ones_like(self._z_min, dtype=np.bool)
 
         # [zestimate_cut] filter out spectra with redshift measurement
         # disagreements. Only look at "Z", "Z_PCA", "Z_VI", "Z_PIPE"
