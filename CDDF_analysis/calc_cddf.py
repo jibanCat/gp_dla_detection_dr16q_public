@@ -92,8 +92,11 @@ class DLACatalogue(object):
         sub_dla: bool = True,
         occams_razor: int = 10000,
         z_dla_minimum: float = 0.1,
-        raw_distfile: str = "DR16Q_v4.fits",
-        zestimate_cut: bool = False,
+        raw_distfile: str = "DR16Q_v4.fits",  # DR16Q only
+        zestimate_cut: bool = False,  # DR16Q only; remove zestimate disagreements
+        is_qso_final_cut: bool = False,  # DR16Q only; only take final QSO samples
+        class_person_cut: bool = False,  # DR16Q only; only take non-BAL samples
+        z_source_cut: bool = False,  # DR16Q only; remove source_z='pipe' and z > 5
     ):
         # Should we include the second DLA?
         self.second_dla = (
@@ -195,10 +198,10 @@ class DLACatalogue(object):
         # [zestimate_cut] filter out spectra with redshift measurement
         # disagreements. Only look at "Z", "Z_PCA", "Z_VI", "Z_PIPE"
         # Note: -1 means no measurements, we should not include those values.
+        self.hdu = fits.open(raw_distfile)
         if zestimate_cut:
             delta_z_qso = 1
 
-            self.hdu = fits.open(raw_distfile)
             # the best redshift measurement column, only in DR16Q
             z_best = self.hdu[1].data["Z"][self.test_ind]
 
@@ -214,15 +217,24 @@ class DLACatalogue(object):
             for z_method in all_z_methods:
                 ind = np.abs(z_best - z_method) < delta_z_qso
 
-                ignore_ind = (z_method == -1)
+                ignore_ind = z_method == -1
                 ind[ignore_ind] = True
 
                 z_condition = ind * z_condition
 
-            print("[Info] {} -> {} after filtering out uncertain z measures.".format(
-                np.sum(self.test_ind), np.sum(z_condition)))
+            print(
+                "[Info] {} -> {} after filtering out uncertain z measures.".format(
+                    np.sum(self.test_ind), np.sum(z_condition)
+                )
+            )
             self.z_condition = z_condition
             self.condition = self.condition * z_condition
+        
+        # [DR16Q cuts] remove questionable QSOs, visual BAL QSOs
+        self.eBOSS_cut(is_qso_final_cut, class_person_cut, z_source_cut)
+        self.is_qso_final_cut = is_qso_final_cut
+        self.class_person_cut = class_person_cut
+        self.z_source_cut = z_source_cut
 
         # [Occam's razor] set up model_posteriors attr and put an additional occam's razor
         self.renormalise_occams_razor(occams_razor=self.occams_razor)
@@ -242,6 +254,51 @@ class DLACatalogue(object):
         # Get the value of NHI at each sample: we do not want to include samples with a column density below the cut.
         self.lnhi_vals = samplefilehandle["log_nhi_samples"][:, 0]
         samplefilehandle.close()
+
+    def eBOSS_cut(
+        self, is_qso_final_cut: bool, class_person_cut: bool, z_source_cut: bool,
+    ):
+        """
+        Apply some cuts defined in the eBOSS paper but did not implemented in build_catalog.mat
+        """
+
+        # the best redshift measurement column, only in DR16Q
+        z_best = self.hdu[1].data["Z"][self.test_ind]
+        # make sure the distfile is the same as the one we used for catalog.mat
+        assert np.all(np.abs(z_best - self.z_qsos) < 1e-3)
+
+        if is_qso_final_cut:
+            is_qso_final = self.hdu[1].data["IS_QSO_FINAL"][self.test_ind]
+            # IS_QSO_FINAL: -2 ~ 2
+            # QSO: 1; Questionable QSO: 2
+            # non QSO: -2 ~ 0
+            # Details see 3.6 section of eBOSS DR16Q paper
+            is_qso_condition = is_qso_final == 1
+
+            self.condition = self.condition * is_qso_condition
+
+        if class_person_cut:
+            class_person = self.hdu[1].data["CLASS_PERSON"][self.test_ind]
+            # visual inspection classification of BAL
+            # 0: no inspected; 1: star; 3: Quasar; 4: Galaxy
+            # 30: BAL Quasar; 50: Blazar (?)
+            # Details see Table 2 and Section 3.5 in DR16Q
+            #
+            # We aim to avoid BAL Quasars but keep those non-inspected
+            human_qso_condition = ~((class_person != 3) & (class_person != 0))
+            assert np.sum(human_qso_condition) == (
+                np.sum(class_person == 3) + np.sum(class_person == 0)
+            )
+
+            self.condition = self.condition * human_qso_condition
+
+        if z_source_cut:
+            source_z = self.hdu[1].data["SOURCE_Z"][self.test_ind]
+            # Section 3.4: Z > 5 and source_z == "pipe" should be considered suspect
+            z_source_condition = ~((source_z == "PIPE") & (z_best > 5))
+
+            self.condition = self.condition * z_source_condition
+
 
     # [Occam's razor] an additional occam's razor to penalise the DLA/subDLA detections
     def renormalise_occams_razor(self, occams_razor=10000):
