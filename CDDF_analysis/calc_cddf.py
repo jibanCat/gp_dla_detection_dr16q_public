@@ -229,7 +229,7 @@ class DLACatalogue(object):
             )
             self.z_condition = z_condition
             self.condition = self.condition * z_condition
-        
+
         # [DR16Q cuts] remove questionable QSOs, visual BAL QSOs
         self.eBOSS_cut(is_qso_final_cut, class_person_cut, z_source_cut)
         self.is_qso_final_cut = is_qso_final_cut
@@ -275,6 +275,11 @@ class DLACatalogue(object):
             # Details see 3.6 section of eBOSS DR16Q paper
             is_qso_condition = is_qso_final == 1
 
+            print(
+                "[Info] {} -> {} after setting IS_QSO_FINAL == 1.".format(
+                    np.sum(self.condition), np.sum(is_qso_condition * self.condition)
+                )
+            )
             self.condition = self.condition * is_qso_condition
 
         if class_person_cut:
@@ -290,6 +295,11 @@ class DLACatalogue(object):
                 np.sum(class_person == 3) + np.sum(class_person == 0)
             )
 
+            print(
+                "[Info] {} -> {} after setting class_person == 3 or 0.".format(
+                    np.sum(self.condition), np.sum(human_qso_condition * self.condition)
+                )
+            )
             self.condition = self.condition * human_qso_condition
 
         if z_source_cut:
@@ -297,8 +307,12 @@ class DLACatalogue(object):
             # Section 3.4: Z > 5 and source_z == "pipe" should be considered suspect
             z_source_condition = ~((source_z == "PIPE") & (z_best > 5))
 
+            print(
+                "[Info] {} -> {} after filtering out SOURCE_Z: PIPE and Z > 5".format(
+                    np.sum(self.condition), np.sum(z_source_condition * self.condition)
+                )
+            )
             self.condition = self.condition * z_source_condition
-
 
     # [Occam's razor] an additional occam's razor to penalise the DLA/subDLA detections
     def renormalise_occams_razor(self, occams_razor=10000):
