@@ -27,11 +27,15 @@ thing_ids        =  dr16_catalog{16};
 plates           =  dr16_catalog{4};
 mjds             =  dr16_catalog{5};
 fiber_ids        =  dr16_catalog{6};
-z_qsos           =  dr16_catalog{27};         % Best available redshift taken from
-                                              % Z VI, Z PIPE, Z DR12Q, Z DR7Q SCH, or Z DR6Q HW
+% z_qsos           =  dr16_catalog{27};         % Best available redshift taken from
+%                                               % Z VI, Z PIPE, Z DR12Q, Z DR7Q SCH, or Z DR6Q HW
+z_qsos           =  dr16_catalog{32};         % Z_PCA instead of best Z; in eBOSS paper they said Z_PCA
+                                              % should be applied for analyses instead of best Z. 
 zwarning         =  dr16_catalog{30};
 bal_visual_flags = (dr16_catalog{57} > 0.75); % 99,856 spectra with BAL PROB ≥ 0.75
 is_qso_dr12q     =  dr16_catalog{21};         % Flag indicating if an object was a quasar in DR12Q
+is_qso_final     = (dr16_catalog{26} == 1);   % a new flag in eBOSS for idenfiying QSO
+bal_class_person = (dr16_catalog{19} == 30);  % a visual inspection classification
 
 num_quasars = numel(z_qsos);
 
@@ -74,7 +78,7 @@ ind = (z_qsos < z_qso_cut);
 filter_flags(ind) = bitset(filter_flags(ind), 1, true);
 
 % filtering bit 1: BAL
-ind = (bal_visual_flags);
+ind = (bal_visual_flags | bal_class_person);
 filter_flags(ind) = bitset(filter_flags(ind), 2, true);
 
 % filtering bit 4: ZWARNING
