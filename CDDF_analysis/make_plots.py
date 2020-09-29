@@ -206,7 +206,8 @@ def do_qso_split(cat, subdir, z_dla_max = 5.0):
     low_z = (2.0,2.5,3.0,3.5)
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
         # here should actually use cat.z_qsos, since there is 3000 km/s difference z_qso and z_max
-        cat.condition = (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
+        # [oldcond] you should select based on oldcond
+        cat.condition = oldcond * (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
         cat.plot_omega_dla(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$", zmax=z_dla_max)
     plt.ylim(ymin=0)
     plt.legend(loc=0)
@@ -214,7 +215,7 @@ def do_qso_split(cat, subdir, z_dla_max = 5.0):
     plt.clf()
 
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
-        cat.condition = (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
+        cat.condition = oldcond * (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
         cat.plot_line_density(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$", zmax=z_dla_max)
     plt.ylim(ymin=0,ymax=0.15)
     plt.legend(loc=0)
@@ -230,7 +231,7 @@ def do_length_split(cat, subdir, z_dla_max = 5):
     low_z = (0., 0.2, 0.4, 0.6, 0.8)
     z_diff = cat.z_max() - cat.z_min()
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
-        cat.condition = (z_diff < high_z_qso)*(z_diff > z_qso_split)
+        cat.condition = oldcond * (z_diff < high_z_qso)*(z_diff > z_qso_split)
         cat.plot_omega_dla(label=str(high_z_qso)+" > zQSO > "+str(z_qso_split), zmax=z_dla_max)
     plt.ylim(ymin=0)
     plt.legend(loc=0)
@@ -238,7 +239,7 @@ def do_length_split(cat, subdir, z_dla_max = 5):
     plt.clf()
 
     for (high_z_qso, z_qso_split) in zip(high_z, low_z):
-        cat.condition = (z_diff < high_z_qso)*(z_diff > z_qso_split)
+        cat.condition = oldcond * (z_diff < high_z_qso)*(z_diff > z_qso_split)
         cat.plot_line_density(label=str(high_z_qso)+" > zQSO > "+str(z_qso_split), zmax=z_dla_max)
     plt.ylim(ymin=0,ymax=0.1)
     plt.legend(loc=0)
@@ -286,7 +287,8 @@ def do_dla_statistics_plots(
     oldcond = cat12.condition
 
     # instead of using z_map like sbird's original code, I use z_qsos
-    cat12.condition = (cat12.z_qsos < high_z_qso) * (cat12.z_qsos > low_z_qso)
+    # [oldcond] here should select within the old cond not create a new cond
+    cat12.condition = oldcond * (cat12.z_qsos < high_z_qso) * (cat12.z_qsos > low_z_qso)
 
     do_data_plots(cat12, subdir, z_dla_max=z_dla_max)
     do_qso_split(cat12, subdir, z_dla_max=z_dla_max)
