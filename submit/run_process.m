@@ -20,10 +20,12 @@ for i = qso_start_ind:qso_end_ind
 
     % prior settings
     % specify the learned quasar model to use
-    training_release  = 'dr12q';
-    training_set_name = 'dr12q_minus_gp';
+    training_release  = 'dr16q';                % where the leanrned file is
+    training_set_name = 'dr16q_minus_dr12q_gp';
+    prior_release     = 'dr12q';                % where the prior catalog and sample files are
 
     % specify the spectra to use for computing the DLA existence prior
+    % Note: here we are still using dr9 prior
     dla_catalog_name  = 'dr9q_concordance';
     prior_ind = ...
         [' prior_catalog.in_dr9 & '             ...
@@ -31,9 +33,9 @@ for i = qso_start_ind:qso_end_ind
         ' prior_catalog.los_inds(dla_catalog_name)'];
 
     % specify the spectra to process
-    release = 'dr14q';
-    test_set_name = 'dr14q';
-    test_ind = '(catalog.filter_flags == 0)';
+    release       = 'dr16q';
+    test_set_name = 'dr16q';
+    test_ind      = '(catalog.filter_flags == 0)';
 
     % set lls parameters
     set_lls_parameters;

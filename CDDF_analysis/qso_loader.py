@@ -15,16 +15,23 @@ Plotting for papers:
 - Some sample spectra with multi-DLAs detections, w/ p(y | theta, Model) -- probably need to write
     into another .mat file to stores all predicted dla Voigt profiles
 '''
+from typing import Tuple
+
 import os
 from collections import namedtuple, Counter
 import h5py
 import numpy as np 
+import scipy
 from scipy import integrate
 from scipy.special import logsumexp
+from scipy import interpolate
+from scipy.linalg import lapack
+
 from matplotlib import pyplot as plt
 from .set_parameters import *
 from .calc_cddf import HubbleByH0, path_length_int
 from .voigt import Voigt_absorption
+from .effective_optical_depth import effective_optical_depth
 
 tau_lyseries = lambda tau, oscillator_strength, transition_wavelength : (tau * 
     oscillator_strength / lya_oscillator_strength * transition_wavelength / lya_wavelength)
@@ -36,7 +43,7 @@ class GPLoader(object):
     tau_0_kim = 0.0023
     beta_kim  =   3.65
 
-    def __init__(self, rest_wavelengths, mu, M, log_tau_0, log_beta, log_c_0, log_omega):
+    def __init__(self, rest_wavelengths, mu, M, log_tau_0, log_beta, log_c_0, log_omega, num_forest_lines: int = 31):
         self.rest_wavelengths = rest_wavelengths
         self.mu = mu
         self.M  = M
@@ -44,8 +51,148 @@ class GPLoader(object):
         self.log_beta  = log_beta
         self.log_c_0   = log_c_0
         self.log_omega = log_omega
+        self.num_forest_lines = num_forest_lines
 
         self.C = self.build_correlation_matrix(M)
+
+        n, k = M.shape
+        self.k = k
+        self.min_lambda = rest_wavelengths.min()
+        self.max_lambda = rest_wavelengths.max()
+
+        # preprocess model interpolants
+        self.mu_interpolator = interpolate.interp1d(rest_wavelengths, mu)
+        self.log_omega_interpolator = interpolate.interp1d(rest_wavelengths, log_omega)
+        self.list_M_interpolators = [
+            interpolate.interp1d(rest_wavelengths, eigenvector) for eigenvector in M.T
+        ]
+
+    def M_interpolator(self, this_rest_wavelengths: np.ndarray) -> np.ndarray:
+        """
+        The interpolant for low-rank decomposition of the covariance matrix.
+        M_interpolator = interpolate
+            griddedInterpolant({rest_wavelengths, 1:k}, M,         'linear');
+        TODO: this needs to be validated. The original MATLAB format has some sort
+        of unspoken wisdom. I assume it is doing 1-D interpolation on each eigenvector.
+        :param this_rest_wavelengths: (n_points, ) the rest wavelengths of the observed data.
+        :return M: (n_points, k) the interpolated low-rank decomposition of the covariance matrix.
+        """
+        assert len(self.list_M_interpolators) == self.k
+
+        M_T = np.empty((self.k, this_rest_wavelengths.shape[0]))
+
+        for i, m_interpolator in enumerate(self.list_M_interpolators):
+            M_T[i, :] = m_interpolator(this_rest_wavelengths)
+
+        return M_T.T
+
+    def set_data(
+        self,
+        X: np.ndarray,
+        Y: np.ndarray,
+        noise_variance: np.ndarray,
+        pixel_mask: np.ndarray,
+        z_qso: float,
+        build_model: bool = True,
+    ) -> None:
+        """
+        Set "testing" data to be evaluated. Now assumed to be a single
+        spectrum, but we can implement a batch of spectra in the future.
+        :param X: (n_points, ) this_rest_wavelengths, the emission wavelengths of the spectrum.
+        :param Y: (n_points, ) this_flux, the flux of the observed spectrum
+        :param noise_variance: (n_points, ) the instrumental noise variance per pixel.
+        :param pixel_mask: (n_points, ) the pixel mask corresponding to the read_spec you used.
+        :param z_qso: the redshift of the quasar.
+        Note: n_points represents number of pixels within a spectrum
+        """
+        self.x = X
+        self.y = Y
+        self.v = noise_variance
+        self.pixel_mask = pixel_mask
+        self.z_qso = z_qso
+
+        # apply pixel mask and filter spectrum within modelling range
+        ind = (self.x >= self.min_lambda) & (self.x <= self.max_lambda)
+        self.ind_unmasked = ind
+
+        # keep complete copy of equally spaced wavelengths for absorption
+        # computation; supposed to be observed wavelengths
+        self.unmasked_wavelengths = observed_wavelengths(self.x, z_qso)[ind]
+        # filter pixel mask
+        ind = ind & (~self.pixel_mask)
+        self.this_wavelengths = observed_wavelengths(self.x, z_qso)[ind]
+        self.x = self.x[ind]
+        self.y = self.y[ind]
+        self.v = self.v[ind]
+
+        self.ind = ind
+
+        if build_model:
+            self.get_interp(self.x, self.y, self.this_wavelengths, self.z_qso)
+
+    def get_interp(
+        self, x: np.ndarray, y: np.ndarray, wavelengths: np.ndarray, z_qso: float
+    ) -> None:
+        """
+        Build and interpolate the GP model onto the observed data.
+        
+        p(y | λ, zqso, v, ω, M_nodla) = N(y; μ .* a_lya, A_lya (K + Ω) A_lya + V)
+        
+        :param x: this_rest_wavelengths
+        :param y: this_flux
+        :param wavelengths: observed wavelengths, put this arg is just for making the
+            code looks similar to the MATLAB code. This could be taken off in the future.
+        :param z_qso: quasar redshift
+        Note: assume already pixel masked.
+        """
+        # interpolate model onto given wavelengths
+        this_mu = self.mu_interpolator(x)
+        this_M = self.M_interpolator(x)
+
+        this_log_omega = self.log_omega_interpolator(x)
+        this_omega2 = np.exp(2 * this_log_omega)
+
+        # set Lyseries absorber redshift for mean-flux suppression
+        # apply the lya_absorption after the interpolation because NaN will appear in this_mu
+        total_optical_depth = effective_optical_depth(
+            wavelengths,
+            self.beta_kim,
+            self.tau_0_kim,
+            z_qso,
+            self.num_forest_lines,
+        )
+        # total absorption effect of Lyseries absorption on the mean-flux
+        lya_absorption = np.exp(-np.sum(total_optical_depth, axis=1))
+
+        this_mu = this_mu * lya_absorption
+        this_M = this_M * lya_absorption[:, None]
+        assert this_M.shape[1] == self.k
+
+        # set another Lyseries absorber redshift to use in covariance
+        lya_optical_depth = effective_optical_depth(
+            wavelengths,
+            np.exp(self.beta_kim),
+            np.exp(self.tau_0_kim),
+            z_qso,
+            self.num_forest_lines,
+        )
+
+        this_scaling_factor = (
+            1 - np.exp(-np.sum(lya_optical_depth, axis=1)) + np.exp(self.log_c_0)
+        )
+
+        # this is the omega included the Lyseries
+        this_omega2 = this_omega2 * this_scaling_factor ** 2
+
+        # re-adjust (K + Ω) to the level of μ .* exp( -optical_depth ) = μ .* a_lya
+        # now the null model likelihood is:
+        # p(y | λ, zqso, v, ω, M_nodla) = N(y; μ .* a_lya, A_lya (K + Ω) A_lya + V)
+        this_omega2 = this_omega2 * lya_absorption ** 2
+
+        # assign to instance attrs
+        self.this_mu = this_mu
+        self.this_M = this_M
+        self.this_omega2 = this_omega2
 
     @staticmethod
     def build_correlation_matrix(M):
@@ -71,7 +218,6 @@ class GPLoader(object):
         C = np.matmul( M_div_d, M_div_d.T)
 
         return C
-
 
 class QSOLoader(object):
     '''
@@ -108,8 +254,26 @@ class QSOLoader(object):
             self.map_log_nhis = self.processed_file['MAP_log_nhis'][()].T
             self.map_z_dlas   = self.processed_file['MAP_z_dlas'][()].T
 
+
+        # [partial file] if we are reading a partial processed file trim down
+        # the test_ind
+        if self.p_dlas.shape[0] != self.test_real_index.shape[0]:
+            print("[Warning] You have less samples in processed file than test_ind,")
+            print("          you are reading a partial file, otherwise, check your test_ind.")
+            size = self.p_dlas.shape[0]
+            self.test_ind[self.test_real_index[size:]] = False
+            self.test_real_index = np.nonzero(self.test_ind)[0]
+            assert self.test_real_index.shape[0] == self.p_dlas.shape[0]
+            print("[Info] Reading first {} spectra.".format(size))
+
         # load snrs data
-        self.snrs             = self.snrs_file['snrs'][0, :]
+        try:
+            self.snrs         = self.snrs_file['snrs'][0, :]
+        except TypeError as e:
+            # this is to read the file computed by sbird's calc_cddf.compute_all_snrs function
+            print(e)
+            print("[Warning] You are reading the snrs file from calc_cddf.compute_all_snrs.")
+            self.snrs         = self.snrs_file['snrs'][()] 
 
         # store thing_ids based on test_set prior inds
         self.thing_ids = self.catalogue_file['thing_ids'][0, :].astype(np.int)
@@ -132,26 +296,11 @@ class QSOLoader(object):
         self.z_qsos = self.z_qsos[self.test_ind]
         # self.snrs_cat   = self.snrs_cat[self.test_ind]
 
-        # [Occams Razor] Update model posteriors with an additional occam's razor
-        # updating: 1) model_posteriors, p_dlas, p_no_dlas
-        self.model_posteriors = self._occams_model_posteriors(self.model_posteriors, self.occams_razor)
-        self.p_dlas    = self.model_posteriors[:, 1+self.sub_dla:].sum(axis=1)
-        self.p_no_dlas = self.model_posteriors[:, :1+self.sub_dla].sum(axis=1)
-
-        # build a MAP number of DLAs array
-        # construct a reference array of model_posteriors in Roman's catalogue for computing ROC curve
-        multi_p_dlas    = self.model_posteriors # shape : (num_qsos, 2 + num_dlas)
-
-        dla_map_model_index = np.argmax( multi_p_dlas, axis=1 )
-        multi_p_dlas = multi_p_dlas[ np.arange(multi_p_dlas.shape[0]), dla_map_model_index ]
-
         # remove all NaN slices from our sample
-        nan_inds = np.isnan( multi_p_dlas )
+        nan_inds = np.isnan( self.p_dlas )
 
         self.test_ind[self.test_ind == True] = ~nan_inds
 
-        multi_p_dlas          = multi_p_dlas[~nan_inds]
-        dla_map_model_index   = dla_map_model_index[~nan_inds]
         self.test_real_index  = self.test_real_index[~nan_inds]
         self.model_posteriors = self.model_posteriors[~nan_inds, :]
         self.p_dlas           = self.p_dlas[~nan_inds]
@@ -171,6 +320,20 @@ class QSOLoader(object):
         self.log_priors_dla   = self.log_priors_dla[~nan_inds]
 
         self.nan_inds = nan_inds
+
+        # [Occams Razor] Update model posteriors with an additional occam's razor
+        # updating: 1) model_posteriors, p_dlas, p_no_dlas
+        self.model_posteriors = self._occams_model_posteriors(self.model_posteriors, self.occams_razor)
+        self.p_dlas    = self.model_posteriors[:, 1+self.sub_dla:].sum(axis=1)
+        self.p_no_dlas = self.model_posteriors[:, :1+self.sub_dla].sum(axis=1)
+
+        # build a MAP number of DLAs array
+        # construct a reference array of model_posteriors in Roman's catalogue for computing ROC curve
+        multi_p_dlas    = self.model_posteriors # shape : (num_qsos, 2 + num_dlas)
+
+        dla_map_model_index = np.argmax( multi_p_dlas, axis=1 )
+        multi_p_dlas = multi_p_dlas[ np.arange(multi_p_dlas.shape[0]), dla_map_model_index ]
+
         assert np.any( np.isnan( multi_p_dlas )) == False
 
         # get the number of DLAs with the highest val in model_posteriors
@@ -1626,7 +1789,18 @@ class QSOLoader(object):
 
         return self.preloaded_file[ self.preloaded_file['all_noise_variance'][0, nspec_real] ][0]
 
-    
+    def find_this_pixel_mask(self, nspec):
+        '''
+        Find the pixel mask of this QSO spectrum
+
+        Paramters:
+        ----
+        nspec (int) : the index in the test data (processed data)
+        '''
+        nspec_real = self.test_real_index[nspec]
+
+        return self.preloaded_file[ self.preloaded_file['all_pixel_mask'][0, nspec_real] ][0].astype(np.bool_)
+
     def plot_mean_flux(self, nspec, suppressed=True, num_lines=31):
         '''
         Plot mean-flux with observed flux
@@ -1679,18 +1853,24 @@ class QSOLoader(object):
         # for obs data
         this_wavelengths = self.find_this_wavelengths(nspec)
         this_flux        = self.find_this_flux(nspec)
+        this_noise_variance = self.find_this_noise_variance(nspec)
+        this_pixel_mask     = self.find_this_pixel_mask(nspec)
 
         this_rest_wavelengths = emitted_wavelengths(this_wavelengths, self.z_qsos[nspec])
 
         # for building GP model
-        rest_wavelengths = self.GP.rest_wavelengths
-        this_mu = self.GP.mu
+        self.GP.set_data(this_rest_wavelengths, this_flux, this_noise_variance, this_pixel_mask,
+            self.z_qsos[nspec], build_model=True)
+        self.GP.num_forest_lines = num_forest_lines
+
+        rest_wavelengths = self.GP.x
+        this_mu = self.GP.this_mu
 
         # count the effective optical depth from members in Lyman series
-        scale_factor = self.total_scale_factor(
-            self.GP.tau_0_kim, self.GP.beta_kim, self.z_qsos[nspec], self.GP.rest_wavelengths, num_lines=num_forest_lines)
-        if suppressed:
-            this_mu = this_mu * scale_factor
+        # scale_factor = self.total_scale_factor(
+        #     self.GP.tau_0_kim, self.GP.beta_kim, self.z_qsos[nspec], self.GP.rest_wavelengths, num_lines=num_forest_lines)
+        # if suppressed:
+        #     this_mu = this_mu * scale_factor
 
         # get the MAP DLA values
         nth = np.argmax( self.model_posteriors[nspec] ) - 1 - self.sub_dla
@@ -1726,7 +1906,7 @@ class QSOLoader(object):
 
             uids = np.where( unique_ids == self.unique_ids[nspec] )[0]
 
-            this_parks_mu = self.GP.mu * scale_factor
+            this_parks_mu = self.GP.this_mu
             dla_confidences = []
             z_dlas          = []
             log_nhis        = []
@@ -1806,8 +1986,8 @@ class QSOLoader(object):
             indicator = (this_lyman_1pzs <= (1 + z_qso)).astype(np.float)
 
             # avoid the z_qso != max(z_lya) problem
-            if i != 0:
-                this_lyman_1pzs = this_lyman_1pzs * indicator
+            # if i != 0:
+            this_lyman_1pzs = this_lyman_1pzs * indicator
 
             # scale the optical depth from Kim (2007) prior
             this_tau = tau_lyseries(
@@ -2116,4 +2296,122 @@ def search_index_from_another(y, target):
 def make_fig():
     '''this is the size of a spectrum'''
     plt.figure(figsize=(16, 5))
+
+
+def log_mvnpdf_low_rank(
+    y: np.ndarray, mu: np.ndarray, M: np.ndarray, d: np.ndarray, scipy_lapack: bool = True
+) -> float:
+    """
+    efficiently computes
     
+        log N(y; mu, MM' + diag(d))
+    
+    :param y: this_flux, (n_points, )
+    :param mu: this_mu, the mean vector of GP, (n_points, )
+    :param M: this_M, the low rank decomposition of covariance matrix, (n_points, k)
+    :param d: diagonal noise term, (n_points, )
+    """
+    log_2pi = 1.83787706640934534
+
+    n, k = M.shape
+
+    y = y[:, None] - mu[:, None]
+
+    d_inv = 1 / d[:, None]  # (n_points, 1)
+    D_inv_y = d_inv * y  # (n_points, 1)
+    D_inv_M = d_inv * M  # (n_points, k)
+
+    # use Woodbury identity, define
+    #   B = (I + M' D^-1 M),
+    # then
+    #   K^-1 = D^-1 - D^-1 M B^-1 M' D^-1
+    B = np.matmul(M.T, D_inv_M)  # (k, n_points) * (n_points, k) -> (k, k)
+    # add the identity matrix with magic indicing
+    B.ravel()[0 :: (k + 1)] = B.ravel()[0 :: (k + 1)] + 1
+    # numpy cholesky returns lower triangle, different than MATLAB's upper triangle
+    L = np.linalg.cholesky(B)
+    # C = B^-1 M' D^-1
+    if scipy_lapack:
+        tmp = np.matmul(lapack.dtrtri(np.asfortranarray(L), lower=1)[0], D_inv_M.T)
+        C = np.matmul(lapack.dtrtri(np.asfortranarray(L.T), lower=0)[0], tmp)
+    else:
+        tmp = scipy.linalg.solve_triangular(
+            L, D_inv_M.T, lower=True
+        )  # (k, n_points)
+        C = scipy.linalg.solve_triangular(L.T, tmp, lower=False)  # (k, n_points)
+
+    K_inv_y = D_inv_y - np.matmul(D_inv_M, np.matmul(C, y))  # (n_points, 1)
+
+    log_det_K = np.sum(np.log(d)) + 2 * np.sum(np.log(np.diag(L)))
+
+    log_p = -0.5 * (np.matmul(y.T, K_inv_y).sum() + log_det_K + n * log_2pi)
+
+    return log_p
+
+def conditional_mvnpdf_low_rank(
+    y2: np.ndarray, mu1: np.ndarray, mu2: np.ndarray, M1: np.ndarray, M2: np.ndarray, d1: np.ndarray, d2: np.ndarray, scipy_lapack: bool = True
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    efficiently computes
+    
+    % p(y1 | y2, λ, v, ω, z_qso, M) = N(y1; μ1', Σ11')
+    %                    [ Σ11    Σ12 ] 
+    %  μ = [μ1, μ2]; Σ = |            |
+    %                    [ Σ21    Σ22 ]
+    % The μ1 will be updated:
+    %  μ1' = μ1 + Σ12 Σ22^-1 (y2 - μ2)
+    % The Σ11 will be updated:
+    %  Σ11' = Σ11 - Σ12 Σ22^-1 Σ21
+    % 
+    % Note Σ = MM' + diag(d)    
+    """
+    log_2pi = 1.83787706640934534
+
+    n1, k1 = M1.shape
+    n2, k2 = M2.shape
+
+    assert k1 == k2
+    assert y2.shape[0] == n2
+
+    k = k1
+
+    # y2 is the observation we want to condition on
+    y2 = y2[:, None] - mu2[:, None]  # (y2 - μ2)
+
+    # build the inverse Σ22
+    d2_inv = 1 / d2[:, None]  # (n_points, 1)
+
+    D2_inv_M2 = d2_inv * M2  # (n_points, k)
+    D2_inv_y2 = d2_inv * y2  # (n_points, 1)
+
+    # use Woodbury identity, define
+    #   B = (I + M' D^-1 M),
+    # then
+    #   K^-1 = D^-1 - D^-1 M B^-1 M' D^-1
+    B2 = np.matmul(M2.T, D2_inv_M2)  # (k, n_points) * (n_points, k) -> (k, k)
+    # add the identity matrix with magic indicing
+    B2.ravel()[0 :: (k + 1)] = B2.ravel()[0 :: (k + 1)] + 1
+    # numpy cholesky returns lower triangle, different than MATLAB's upper triangle
+    L2 = np.linalg.cholesky(B2)
+    # C = B^-1 M' D^-1
+    if scipy_lapack:
+        tmp = np.matmul(lapack.dtrtri(np.asfortranarray(L2), lower=1)[0], D2_inv_M2.T)
+        C2 = np.matmul(lapack.dtrtri(np.asfortranarray(L2.T), lower=0)[0], tmp)
+    else:
+        tmp = scipy.linalg.solve_triangular(
+            L2, D2_inv_M2.T, lower=True
+        )  # (k, n_points)
+        C2 = scipy.linalg.solve_triangular(L2.T, tmp, lower=False)  # (k, n_points)
+
+    K22_inv_y = D2_inv_y2 - np.matmul(D2_inv_M2, np.matmul(C2, y2))  # (n_points, 1)
+
+    K22_inv_Sigma21 = d2_inv * np.matmul(M2, M1.T) - np.matmul( D2_inv_M2,
+        np.matmul(C2, np.matmul(M2, M1.T)) )
+
+    # μ1' = μ1 + Σ12 Σ22^-1 (y2 - μ2)
+    mu1 = mu1 + np.matmul(np.matmul(M1, M2.T), K22_inv_y)
+
+    # Σ11' = Σ11 - Σ12 Σ22^-1 Σ21
+    Sigma11 = np.diag(d1) + np.matmul(M1, M1.T) - np.matmul(np.matmul(M1, M2.T), K22_inv_Sigma21)
+
+    return mu1, Sigma11

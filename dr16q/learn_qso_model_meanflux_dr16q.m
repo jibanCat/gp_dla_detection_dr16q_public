@@ -4,15 +4,18 @@
 %
 %   lift     mean-flux mu in the learning script via median(   y .* exp( + optical_depth ) ),
 %   suppress mean-flux mu in the processing script via mu' := mu .* exp( - optical_depth );
+%
+% suggested train_id:
+% this is train on DR12Q flags with DR16Q spectra
+training_release  = 'dr16q';
+dla_catalog_name  = 'dr12q_gp';
+train_ind = ...
+    [' catalog.in_dr12_z                  & ' ...
+     '(catalog.filter_flags == 0)         & ' ...
+     ' catalog.los_inds(dla_catalog_name) & ' ...
+     '~catalog.dla_inds(dla_catalog_name)'];
 
 rng('default');
-
-% [train_dr12q] train_ind here to simplicity; move to other file in the future
-% train all of the spectra in dr12q with p_no_dlas > 0.9
-training_release = 'dr12q';
-training_set_name = 'dr12q_minus_gp';
-dla_catalog_name = 'dr12q_gp';
-train_ind = 'processed.test_ind';
 
 % load catalog
 catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
@@ -23,19 +26,11 @@ variables_to_load = {'all_wavelengths', 'all_flux', 'all_noise_variance', ...
 load(sprintf('%s/preloaded_qsos', processed_directory(training_release)), ...
      variables_to_load{:});
 
-% [train_dr12q] also load the processed file
-processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_zwarn_occams_trunc_dr12q', ...
-  processed_directory(training_release)));
-
 % determine which spectra to use for training; allow string value for
 % train_ind
 if (ischar(train_ind))
   train_ind = eval(train_ind);
 end
-
-% [train_dr12q] exclude p_dlas > 0.9
-ind = (processed.p_dlas > 0.9);
-train_ind(ind) = false;
 
 fprintf('Total training set size: %d', sum(train_ind));
 
@@ -80,7 +75,7 @@ for i = 1:num_quasars
     is_empty(i, 1) = 1;
     continue;
   end
-
+  
   this_rest_wavelengths = emitted_wavelengths(this_wavelengths, z_qso);
 
   lya_1pzs(i, :) = ...
@@ -96,7 +91,7 @@ for i = 1:num_quasars
   % lya_1pzs(i, :) = lya_1pzs(i, :) .* indicator;
 
   % include all members in Lyman series to the forest
-  for j = 1:num_forest_lines
+  for j = 1:num_forest_lines  
     this_transition_wavelength = all_transition_wavelengths(j);
 
     all_lyman_1pzs(j, i, :) = ...
@@ -107,7 +102,7 @@ for i = 1:num_quasars
     % indicator function: z absorbers <= z_qso
     indicator = all_lyman_1pzs(j, i, :) <= (1 + z_qso);
 
-    all_lyman_1pzs(j, i, :) = all_lyman_1pzs(j, i, :) .* indicator;
+    all_lyman_1pzs(j, i, :) = all_lyman_1pzs(j, i, :) .* indicator;    
   end
 
   rest_fluxes(i, :) = ...
