@@ -1827,7 +1827,7 @@ class QSOLoader(object):
         return self.GP.rest_wavelengths, this_mu
 
     def plot_this_mu(self, nspec, suppressed=True, num_voigt_lines=3, num_forest_lines=31, Parks=False, dla_parks=None, 
-        label="", new_fig=True, color="red"):
+        label="", new_fig=True, color="red", conditional_gp: bool = False, color_cond: str = "lightblue"):
         '''
         Plot the spectrum with the dla model
 
@@ -1945,6 +1945,21 @@ class QSOLoader(object):
             plt.plot(rest_wavelengths, this_mu, 
                 label=label + r"$\mathcal{M}$"+r" DLA({n})".format(n=0) + ": {:.3g}".format(self.p_no_dlas[nspec]), 
                 color=color)
+
+        # [conditional GP]
+        if conditional_gp:
+            ind_1 = self.GP.x <= lya_wavelength
+            y2       = self.GP.y[~ind_1]
+            this_mu1 = self.GP.this_mu[ ind_1]
+            this_mu2 = self.GP.this_mu[~ind_1]
+            this_M1  = self.GP.this_M[  ind_1, :]
+            this_M2  = self.GP.this_M[ ~ind_1, :]
+            d1       = self.GP.v[ ind_1] + self.GP.this_omega2[ ind_1]
+            d2       = self.GP.v[~ind_1] + self.GP.this_omega2[~ind_1]
+
+            mu1, Sigma11 = conditional_mvnpdf_low_rank(y2, this_mu1, this_mu2, this_M1, this_M2, d1, d2)
+
+            plt.plot(self.GP.x[ind_1], mu1[:, 0], label="conditional GP (suppressed)", color=color_cond)
 
         plt.xlabel(r"rest-wavelengths $\lambda_{\mathrm{rest}}$ $\AA$")
         plt.ylabel(r"normalised flux")
@@ -2409,7 +2424,7 @@ def conditional_mvnpdf_low_rank(
         np.matmul(C2, np.matmul(M2, M1.T)) )
 
     # μ1' = μ1 + Σ12 Σ22^-1 (y2 - μ2)
-    mu1 = mu1 + np.matmul(np.matmul(M1, M2.T), K22_inv_y)
+    mu1 = mu1[:, None] + np.matmul(np.matmul(M1, M2.T), K22_inv_y)
 
     # Σ11' = Σ11 - Σ12 Σ22^-1 Σ21
     Sigma11 = np.diag(d1) + np.matmul(M1, M1.T) - np.matmul(np.matmul(M1, M2.T), K22_inv_Sigma21)
