@@ -242,6 +242,9 @@ for i = 1:numel(selected_thing_ids)
       end
 
       absorption = absorption(mask_ind);
+      % [beyond lya] set Lya absorption to 1 if beyond lya
+      indicator  = this_rest_wavelengths > lya_wavelength;
+      absorption(indicator) = 1;
 
       dla_mu     = this_mu     .* absorption;
       dla_M      = this_M      .* absorption;
@@ -259,6 +262,9 @@ for i = 1:numel(selected_thing_ids)
           lls_nhi_samples(i), num_lines);
 
         absorption = absorption(mask_ind);
+        % [beyond lya] set Lya absorption to 1 if beyond lya
+        indicator  = this_rest_wavelengths > lya_wavelength;
+        absorption(indicator) = 1;
 
         lls_mu     = this_mu     .* absorption;
         lls_M      = this_M      .* absorption;
