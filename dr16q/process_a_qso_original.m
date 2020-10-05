@@ -12,7 +12,6 @@ min_z_dla = @(wavelengths, z_qso) ...         % determines minimum z_DLA to sear
         observed_wavelengths(lyb_wavelength, z_qso) / lya_wavelength - 1 + ...
         min_z_cut);
 
-selected_thing_ids = [355787041]; % 23097883
 [vals, selected_quasar_inds]= intersect(thing_ids, selected_thing_ids, 'stable');
 selected_thing_ids = vals; % update the vals since the ordering would change
 
