@@ -11,6 +11,8 @@ from .qso_loader import QSOLoader, file_loader
 from .set_parameters import *
 from .dla_data import dla_data
 
+from .effective_optical_depth import effective_optical_depth
+
 cmap = cm.get_cmap('viridis')
 
 # change fontsize
@@ -691,3 +693,50 @@ def check_skylines(qsos):
             if np.any(np.abs(delta_zabs) < min_z_seperation ):
                 skyline_dlas.append(nspec)
                 continue
+
+def do_demo_kim_prior(
+        qsos: QSOLoader,
+        tau_0_mu: float = 0.0023,
+        tau_0_sigma: float = 0.0007,
+        beta_mu: float = 3.65,
+        beta_sigma:float = 0.21,
+        num_forest_lines: int = 31,
+    ):
+    """
+    Demo the variance caused by Kim prior
+    """
+    mu = qsos.GP.mu
+    rest_wavelengths = qsos.GP.rest_wavelengths
+
+    # a list of zQSO to demo
+    z_qsos_list = [2.15, 3, 3.5, 4, 4.5, 5, 5.5, 6]
+
+    for z_qso in z_qsos_list:
+        wavelengths = observed_wavelengths(rest_wavelengths, z_qso)
+
+        # mean GP prior
+        lyman_absorption = effective_optical_depth(wavelengths, beta_mu, tau_0_mu, z_qso, num_forest_lines=num_forest_lines)
+        mu_mean = mu * np.exp(-np.sum(lyman_absorption, axis=1))
+
+        # lower bound GP prior
+        lyman_absorption = effective_optical_depth(wavelengths, beta_mu + beta_sigma, tau_0_mu + tau_0_sigma, z_qso, num_forest_lines=num_forest_lines)
+        mu_lower = mu * np.exp(-np.sum(lyman_absorption, axis=1))
+
+        # upper bound GP prior
+        lyman_absorption = effective_optical_depth(wavelengths, beta_mu - beta_sigma, tau_0_mu - tau_0_sigma, z_qso, num_forest_lines=num_forest_lines)
+        mu_upper = mu * np.exp(-np.sum(lyman_absorption, axis=1))
+
+        # approximated Kim variance for GP
+        variance = np.max([np.abs(mu_upper - mu_mean), np.abs(mu_mean - mu_lower)], axis=0)
+
+        plt.figure(figsize=(16, 5))
+        plt.plot(rest_wavelengths, mu_mean, label="GP mean; zQSO = {:.3g}".format(z_qso))
+        plt.fill_between(rest_wavelengths, y1=mu_lower, y2=mu_upper, alpha=0.3, label="mu .* delta optical depth")
+        plt.fill_between(rest_wavelengths, y1=mu_mean - variance, y2=mu_mean + variance, alpha=0.3, label="mu +- variance")
+        plt.xlabel(r"Rest-wavelengths ($\AA$)")
+        plt.ylabel(r"Normalized Flux")
+        plt.ylim(-1, 5)
+        plt.legend()
+        save_figure("demo_kim_prior_effects_zQSO_{:.2g}".format(z_qso))
+        plt.clf()
+        plt.close()
