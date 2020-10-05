@@ -60,6 +60,10 @@ hold on
         end
 
         absorption = absorption(mask_ind);
+        % [beyond lya] set Lya absorption to 1 if beyond lya
+        indicator  = this_rest_wavelengths > lya_wavelength;
+        absorption(indicator) = 1;
+
         dla_mu = this_mu .* absorption;
     
     else
