@@ -76,7 +76,7 @@ hold on
         this_z_dlas = (this_wavelengths / lya_wavelength) - 1;
         p_flux = plot(this_z_dlas, this_flux);
         xlim([min(sample_z_dlas) max(sample_z_dlas)]);
-        ylim([min(this_flux)     max(this_flux)]);
+        ylim([-1     5]);
         xlabel('(observed wavelengths $\lambda$ (\AA) / 1216 (\AA)) - 1', 'FontSize', 14, 'Interpreter','latex');
         ylabel('normalized flux $\mathbf{y}$',                            'FontSize', 14, 'Interpreter','latex');
         p_dla = plot(this_z_dlas, dla_mu);
@@ -115,5 +115,24 @@ hold on
     ylabel('Normalized Flux $\mathbf{y}$', 'FontSize', 14, 'Interpreter','latex');
 
     legend( [f dm tm conmu], {'observed flux', '$\mu$(DLA)', '$\mu$(Null)', '$\mu$(Continuum)'},...
+    'Interpreter','latex', 'FontSize', 14);
+hold off
+
+figure(3)
+hold on
+
+    norm_sample_kim_log_likelihoods = sample_kim_log_likelihoods(1, :);
+    norm_sample_kim_log_likelihoods = norm_sample_kim_log_likelihoods - max(norm_sample_kim_log_likelihoods);
+    norm_sample_kim_log_likelihoods = norm_sample_kim_log_likelihoods - log(sum(exp(norm_sample_kim_log_likelihoods)));
+
+    scatter(tau_0_samples, beta_samples, 40, norm_sample_kim_log_likelihoods, 'filled');
+
+    s = scatter(tau_0_map, beta_map, 80, 'b', 'filled', 'd', 'DisplayName', 'MAP predictions');
+
+    xlim([tau_0_mu - 4 * tau_0_sigma tau_0_mu + 4 * tau_0_sigma])
+    xlabel('$\tau_o$', 'FontSize', 14, 'Interpreter','latex');
+    ylabel('$\beta$', 'FontSize', 14, 'Interpreter','latex');
+
+    legend( [s], {'MAP effective optical depth'},...
     'Interpreter','latex', 'FontSize', 14);
 hold off
