@@ -43,9 +43,12 @@ for i = qso_start_ind:qso_end_ind
     % generate tau0 samples
     addpath dr16q/
     generate_optical_depth_samples;
+    assert(numel(tau_0_samples) == num_optical_depth_samples)
 
     % start from the stopped ind last time
     qsos_num_offset = offset + (i - 1) * num_quasars;
 
-    process_qsos_multiple_dlas_meanflux
+    process_qsos_multiple_dlas_meanflux_tau0
+
+    assert(numel(MAP_tau_0) == num_quasars)
 end
