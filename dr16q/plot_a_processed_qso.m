@@ -125,13 +125,17 @@ hold on
     norm_sample_kim_log_likelihoods = norm_sample_kim_log_likelihoods - max(norm_sample_kim_log_likelihoods);
     norm_sample_kim_log_likelihoods = norm_sample_kim_log_likelihoods - log(sum(exp(norm_sample_kim_log_likelihoods)));
 
-    scatter(tau_0_samples, beta_samples, 40, norm_sample_kim_log_likelihoods, 'filled');
+    % scatter(tau_0_samples, beta_samples, 40, norm_sample_kim_log_likelihoods, 'filled');
 
-    s = scatter(tau_0_map, beta_map, 80, 'b', 'filled', 'd', 'DisplayName', 'MAP predictions');
+    % s = scatter(tau_0_map, beta_map, 80, 'b', 'filled', 'd', 'DisplayName', 'MAP predictions');
 
-    xlim([tau_0_mu - 4 * tau_0_sigma tau_0_mu + 4 * tau_0_sigma])
+    scatter(tau_0_samples, norm_sample_kim_log_likelihoods, 40, 'filled');
+
+    s = scatter(tau_0_map, max(norm_sample_kim_log_likelihoods), 80, 'b', 'filled', 'd', 'DisplayName', 'MAP predictions');
+
+    xlim([min(tau_0_samples) max(tau_0_samples)])
     xlabel('$\tau_o$', 'FontSize', 14, 'Interpreter','latex');
-    ylabel('$\beta$', 'FontSize', 14, 'Interpreter','latex');
+    ylabel('Normalised Likelihoods', 'FontSize', 14, 'Interpreter','latex');
 
     legend( [s], {'MAP effective optical depth'},...
     'Interpreter','latex', 'FontSize', 14);

@@ -20,7 +20,7 @@ min_z_dla = @(wavelengths, z_qso) ...         % determines minimum z_DLA to sear
 [vals, selected_quasar_inds]= intersect(thing_ids, selected_thing_ids, 'stable');
 selected_thing_ids = vals; % update the vals since the ordering would change
 
-sample_kim_log_likelihoods = nan(num_quasars, num_dla_samples);
+sample_kim_log_likelihoods = nan(num_quasars, num_optical_depth_samples);
 MAP_tau_0 = nan(num_quasars, 1);
 MAP_beta  = nan(num_quasars, 1);
 
@@ -127,7 +127,7 @@ for i = 1:numel(selected_thing_ids)
     % set Lyseries absorber redshift for mean-flux suppression
     % apply the lya_absorption after the interpolation because NaN will appear in this_mu
     total_optical_depth = effective_optical_depth(this_wavelengths, ...
-        beta_samples(j), tau_0_samples(j), z_qso, ...
+        beta_mu, tau_0_samples(j), z_qso, ...
         all_transition_wavelengths, all_oscillator_strengths, ...
         num_forest_lines);
 
@@ -162,14 +162,14 @@ for i = 1:numel(selected_thing_ids)
   % [MAP optical depth]
   [~, maxidx] = nanmax(sample_kim_log_likelihoods(quasar_ind, :));
   tau_0_map   = tau_0_samples(maxidx);
-  beta_map    = beta_samples(maxidx);
-  fprintf_debug('tau_0_map : %0.5f; beta_map : %0.2f\n', ...
-                tau_0_map, beta_map);
+%   beta_map    = beta_samples(maxidx);
+  fprintf_debug('tau_0_map : %0.5f\n', ...
+                tau_0_map);
 
   % set Lyseries absorber redshift for mean-flux suppression
   % apply the lya_absorption after the interpolation because NaN will appear in this_mu
   total_optical_depth = effective_optical_depth(this_wavelengths, ...
-      beta_map, tau_0_map, z_qso, ...
+      beta_mu, tau_0_map, z_qso, ...
       all_transition_wavelengths, all_oscillator_strengths, ...
       num_forest_lines);
 
