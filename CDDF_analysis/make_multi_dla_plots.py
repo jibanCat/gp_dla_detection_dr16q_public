@@ -4,6 +4,8 @@ Make plots for the Multi-DLA paper
 import os
 import numpy as np 
 from scipy.interpolate import interp1d
+from astropy.io import fits
+
 import matplotlib 
 from matplotlib import pyplot as plt 
 from matplotlib import cm
@@ -740,3 +742,110 @@ def do_demo_kim_prior(
         save_figure("demo_kim_prior_effects_zQSO_{:.2g}".format(z_qso))
         plt.clf()
         plt.close()
+
+def do_dr12q_dr16q_spec_comparison(
+        all_specs_dr16q: np.ndarray,
+        qsos_dr16q: QSOLoader,
+        qsos_dr12q: QSOLoader,
+        dr16q_distfile: str = "DR16Q_v4.fits",
+    ):
+    hdu = fits.open(dr16q_distfile)
+
+    # unique IDs are the spec IDs in integer form
+    qsos_dr16q.unique_ids = qsos_dr16q.make_unique_id(qsos_dr16q.plates, qsos_dr16q.mjds, qsos_dr16q.fiber_ids)
+    qsos_dr12q.unique_ids = qsos_dr12q.make_unique_id(qsos_dr12q.plates, qsos_dr12q.mjds, qsos_dr12q.fiber_ids)
+
+    # loop over shared unique_ids between DR12Q and DR16Q
+    for nspec,unique_id in zip(all_specs_dr16q, qsos_dr16q.unique_ids[all_specs_dr16q]):
+
+        if unique_id in qsos_dr12q.unique_ids:
+            nspec_dr12q = np.where(unique_id == qsos_dr12q.unique_ids)[0][0]
+
+            wavelengths_dr12q    = qsos_dr12q.find_this_wavelengths(nspec_dr12q)
+            noise_variance_dr12q = qsos_dr12q.find_this_noise_variance(nspec_dr12q)
+            flux_dr12q           = qsos_dr12q.find_this_flux(nspec_dr12q)
+
+            wavelengths          = qsos_dr16q.find_this_wavelengths(nspec)
+            noise_variance       = qsos_dr16q.find_this_noise_variance(nspec)
+            flux                 = qsos_dr16q.find_this_flux(nspec)
+
+            # Rest-frame
+            rest_wavelengths = emitted_wavelengths(wavelengths, qsos_dr16q.z_qsos[nspec])
+            rest_wavelengths_dr12q = emitted_wavelengths(wavelengths_dr12q, qsos_dr12q.z_qsos[nspec_dr12q])
+
+            fig, ax = plt.subplots(3, 1, figsize=(16, 15))
+            # [first plot] plot two spectra together
+            ax[0].plot(rest_wavelengths_dr12q, flux_dr12q, label="BOSS DR12Q", color="C1", lw=0.3)
+            ax[0].plot(rest_wavelengths, flux, label="eBOSS DR16Q", color="C0", lw=0.3)
+            ax[0].set_title(
+                'thing ID = {}; z = {:.2g}, zPCA = {:.2g}, zPIPE = {:.2g}, zVI = {:.2g};\nsource_z = {}; IS_QSO_FINAL = {}; CLASS_PERSON = {} (30: BALQSO, 50: Blazar)'.format(
+                    qsos_dr16q.thing_ids[nspec],
+                    qsos_dr16q.z_qsos[nspec],
+                    hdu[1].data["Z_PCA"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["Z_PIPE"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["Z_VI"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["SOURCE_Z"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["IS_QSO_FINAL"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["CLASS_PERSON"][qsos_dr16q.test_real_index][nspec]
+                )
+            )
+            ax[0].set_xlabel(r"Rest-Wavelengths $\AA$")
+            ax[0].set_ylabel(r"Normalized Flux")
+            ax[0].set_ylim(-1, 5)
+            ax[0].legend()
+
+            # [second plot] residual of the flux (DR12Q - DR16Q)
+            # DR16Q and DR12Q, rest_wavelengths are not exactly the same. Do interp.
+            f_dr12q = interp1d(rest_wavelengths_dr12q, flux_dr12q)
+            ind = (rest_wavelengths <= np.max(rest_wavelengths_dr12q)) & (rest_wavelengths >= np.min(rest_wavelengths_dr12q))
+            flux_residual = f_dr12q(rest_wavelengths[ind]) - flux[ind]
+
+            ax[1].plot(rest_wavelengths[ind], flux_residual, label="interp(flux(DR12Q))[lambda_dr16q] - flux(DR16Q)[:]", color='red', lw=0.3)
+            ax[1].fill_between(rest_wavelengths, -np.sqrt(np.abs(noise_variance)), np.sqrt(np.abs(noise_variance)), color="C0", alpha=0.3, label="DR16Q noise STD")
+            ax[1].fill_between(rest_wavelengths_dr12q, -np.sqrt(np.abs(noise_variance_dr12q)), np.sqrt(np.abs(noise_variance_dr12q)), color="C1", alpha=0.3, label="DR12Q noise STD")
+            ax[1].hlines(0, min(rest_wavelengths), max(rest_wavelengths), ls="--", color='k')
+            ax[1].set_ylim(-1, 1)
+            ax[1].set_xlabel(r"Rest-Wavelengths $\AA$")
+            ax[1].set_ylabel(r"$\Delta$ Flux")
+            ax[1].legend()
+
+            # [third plot] noise variance comparison
+            ax[2].semilogy(rest_wavelengths, noise_variance, label="DR16Q noise variance", color="C0")
+            ax[2].semilogy(rest_wavelengths_dr12q, noise_variance_dr12q, label="DR12Q noise variance", color="C1")
+            ax[2].set_xlabel(r"Rest-Wavelengths $\AA$")
+            ax[2].set_ylabel(r"Noise Variance")
+            ax[2].legend()
+
+            plt.tight_layout()
+            save_figure("plot_specs/Comparison_dr12q_in_dr16q_dr16q_train_dr16q_snrs_leq_4_pdlas_0_5_zqso_4/this_{}_DR12_DR16_spectrum".format(qsos_dr16q.unique_ids[nspec]))
+            plt.clf()
+            plt.close()
+
+            qsos_dr16q.plot_this_mu(
+                nspec,
+                label="DR16Q GP",
+                conditional_gp=True,
+            )
+            qsos_dr12q.plot_this_mu(
+                nspec_dr12q,
+                label="DR12Q GP",
+                new_fig=False,
+                color="orange",
+            )
+            plt.title(
+                'thing ID = {}; z = {:.2g}, zPCA = {:.2g}, zPIPE = {:.2g}, zVI = {:.2g};\nsource_z = {}; IS_QSO_FINAL = {}; CLASS_PERSON = {} (30: BALQSO, 50: Blazar)'.format(
+                    qsos_dr16q.thing_ids[nspec],
+                    qsos_dr16q.z_qsos[nspec],
+                    hdu[1].data["Z_PCA"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["Z_PIPE"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["Z_VI"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["SOURCE_Z"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["IS_QSO_FINAL"][qsos_dr16q.test_real_index][nspec],
+                    hdu[1].data["CLASS_PERSON"][qsos_dr16q.test_real_index][nspec]
+                )
+            )
+            plt.ylim(-1, 5)
+            plt.tight_layout()
+            save_figure("plot_specs/Comparison_dr12q_in_dr16q_dr16q_train_dr16q_snrs_leq_4_pdlas_0_5_zqso_4/this_{}_DR12_DR16_GP".format(qsos_dr16q.unique_ids[nspec]))
+            plt.clf()
+            plt.close()
