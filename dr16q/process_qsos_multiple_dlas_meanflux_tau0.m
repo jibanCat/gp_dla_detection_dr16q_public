@@ -1,4 +1,4 @@
-% process_qsos_multiple_dlas_meanflux: run DLA detection algorithm on specified objects
+% process_qsos_multiple_dlas_meanflux_tau0: run DLA detection algorithm on specified objects
 % while using lower lognhi range (defined in set_lls_parameters.m) as an alternative model; 
 % Note: model_posterior(quasar_ind, :) ... 
 % = [p(no dla | D), p(lls | D), p(1 dla | D), p(2 dla | D), ...]
@@ -27,6 +27,9 @@
 % 
 % March 8, 2019: add additional Occam's razor factor between DLA models and null model:
 %   P(DLAs | D) := P(DLAs | D) / num_dla_samples
+%
+% Oct 10, 2020: sampling tau0 using a uniform prior. The generation sample file
+% is in generate_optical_depth_samples.m
 
 % multi-dlas parameters
 max_dlas = 4;
@@ -37,6 +40,9 @@ tau_0_mu    = 0.0023;
 tau_0_sigma = 0.0007;
 beta_mu     = 3.65;
 beta_sigma  = 0.21;
+% print out the samples used in tau0 sampling
+fprintf_debug('Sampling tau0 %0.3f~%0.3f, %i samples\n', ...
+    min(tau_0_samples), max(tau_0_samples), numel(tau_0_samples) );
 
 % load redshifts/DLA flags from training release
 prior_catalog = ...
@@ -143,6 +149,10 @@ beta  = exp(log_beta);
 % handle the inds of empty spectra
 all_exceptions = nan(num_quasars, 1);
 
+% [sampling tau0] find the optimal optical depth per QSO
+sample_kim_log_likelihoods = nan(num_quasars, num_optical_depth_samples);
+MAP_tau_0 = nan(num_quasars, 1);
+
 for quasar_ind = 1:num_quasars
   tic;
   rng('default');  % random number should be set for each qso run
@@ -234,10 +244,58 @@ for quasar_ind = 1:num_quasars
   this_log_omega = log_omega_interpolator(this_rest_wavelengths);
   this_omega2 = exp(2 * this_log_omega);
 
+  % [sample optical depth] sampling the effective optical depth, find MAP
+  parfor j = 1:num_optical_depth_samples
+
+    this_omega2_kim = this_omega2;
+    this_mu_kim     = this_mu;
+    this_M_kim      = this_M;
+
+    % set Lyseries absorber redshift for mean-flux suppression
+    % apply the lya_absorption after the interpolation because NaN will appear in this_mu
+    total_optical_depth = effective_optical_depth(this_wavelengths, ...
+        beta_mu, tau_0_samples(j), z_qso, ...
+        all_transition_wavelengths, all_oscillator_strengths, ...
+        num_forest_lines);
+
+    % total absorption effect of Lyseries absorption on the mean-flux
+    lya_absorption = exp(- sum(total_optical_depth, 2) );
+
+    this_mu_kim = this_mu_kim .* lya_absorption;
+    this_M_kim  = this_M_kim  .* lya_absorption;
+
+    % set another Lysieres absorber redshift to use in coveriance
+    lya_optical_depth = effective_optical_depth(this_wavelengths, ...
+        beta, tau_0, z_qso, ...
+        all_transition_wavelengths, all_oscillator_strengths, ...
+        num_forest_lines);
+
+    this_scaling_factor = 1 - exp( -sum(lya_optical_depth, 2) ) + c_0;
+
+    % this is the omega included the Lyseries
+    this_omega2_kim = this_omega2_kim .* this_scaling_factor.^2;
+
+    % re-adjust (K + Ω) to the level of μ .* exp( -optical_depth ) = μ .* a_lya
+    % now the null model likelihood is:
+    % p(y | λ, zqso, v, ω, M_nodla) = N(y; μ .* a_lya, A_lya (K + Ω) A_lya + V)
+    this_omega2_kim = this_omega2_kim .* lya_absorption.^2;
+
+    % baseline: probability of no DLA model
+    sample_kim_log_likelihoods(quasar_ind, j) = ...
+      log_mvnpdf_low_rank(this_flux, this_mu_kim, this_M_kim, ...
+          this_omega2_kim + this_noise_variance);
+  end
+
+  % [MAP optical depth]
+  [~, maxidx] = nanmax(sample_kim_log_likelihoods(quasar_ind, :));
+  tau_0_map   = tau_0_samples(maxidx);
+  fprintf_debug('tau_0_map : %0.5f\n', ...
+                tau_0_map);
+
   % set Lyseries absorber redshift for mean-flux suppression
   % apply the lya_absorption after the interpolation because NaN will appear in this_mu
   total_optical_depth = effective_optical_depth(this_wavelengths, ...
-      beta_mu, tau_0_mu, z_qso, ...
+      beta_mu, tau_0_map, z_qso, ...
       all_transition_wavelengths, all_oscillator_strengths, ...
       num_forest_lines);
 
@@ -484,17 +542,18 @@ variables_to_save = {'training_release', 'prior_release', 'training_set_name', .
                      'log_likelihoods_dla', 'log_likelihoods_lls', ...
                      'log_posteriors_no_dla', 'log_posteriors_dla', 'log_posteriors_lls', ...
                      'model_posteriors', 'p_no_dlas', 'p_dlas', 'p_lls', ...
-                     'all_exceptions', 'sample_log_likelihoods_lls'};
+                     'all_exceptions', 'sample_log_likelihoods_lls', ...
+                     'sample_kim_log_likelihoods', 'MAP_tau_0', 'tau_0_samples'};
 
 if (exist('test_ind', 'var'))
-  filename = sprintf('%s/processed_qsos_multi_meanflux%s_%d-%d', ...
+  filename = sprintf('%s/processed_qsos_multi_meanflux_tau0_%s_%d-%d', ...
                      processed_directory(release), ...
                      test_set_name, ...
                      qsos_num_offset, qsos_num_offset + num_quasars);
 
   variables_to_save{end + 1} = 'test_ind';
 else
-  filename = sprintf('%s/processed_qsos_multi_meanflux_%d_%d', ...
+  filename = sprintf('%s/processed_qsos_multi_meanflux_tau0_%d_%d', ...
                      processed_directory(release), ...
                      qsos_num_offset, qsos_num_offset + num_quasars);
 end

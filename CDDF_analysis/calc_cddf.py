@@ -205,17 +205,17 @@ class DLACatalogue(object):
             # the best redshift measurement column, only in DR16Q
             z_best = self.hdu[1].data["Z"][self.test_ind]
 
-            # make sure the distfile is the same as the one we used for catalog.mat
-            assert np.all(np.abs(z_best - self.z_qsos) < 1e-3)
-
             z_pca = self.hdu[1].data["Z_PCA"][self.test_ind]
             z_pipe = self.hdu[1].data["Z_PIPE"][self.test_ind]
             z_vi = self.hdu[1].data["Z_VI"][self.test_ind]
 
+            # make sure the distfile is the same as the one we used for catalog.mat
+            assert np.all(np.abs(z_pca - self.z_qsos) < 1e-3)
+
             all_z_methods = [z_pca, z_pipe, z_vi]
-            z_condition = np.ones_like(z_best, dtype=np.bool)
+            z_condition = np.ones_like(z_pca, dtype=np.bool)
             for z_method in all_z_methods:
-                ind = np.abs(z_best - z_method) < delta_z_qso
+                ind = np.abs(z_pca - z_method) < delta_z_qso
 
                 ignore_ind = z_method == -1
                 ind[ignore_ind] = True
@@ -263,9 +263,9 @@ class DLACatalogue(object):
         """
 
         # the best redshift measurement column, only in DR16Q
-        z_best = self.hdu[1].data["Z"][self.test_ind]
+        z_pca = self.hdu[1].data["Z_PCA"][self.test_ind]
         # make sure the distfile is the same as the one we used for catalog.mat
-        assert np.all(np.abs(z_best - self.z_qsos) < 1e-3)
+        assert np.all(np.abs(z_pca - self.z_qsos) < 1e-3)
 
         if is_qso_final_cut:
             is_qso_final = self.hdu[1].data["IS_QSO_FINAL"][self.test_ind]
@@ -305,7 +305,7 @@ class DLACatalogue(object):
         if z_source_cut:
             source_z = self.hdu[1].data["SOURCE_Z"][self.test_ind]
             # Section 3.4: Z > 5 and source_z == "pipe" should be considered suspect
-            z_source_condition = ~((source_z == "PIPE") & (z_best > 5))
+            z_source_condition = ~((source_z == "PIPE") & (z_pca > 5))
 
             print(
                 "[Info] {} -> {} after filtering out SOURCE_Z: PIPE and Z > 5".format(

@@ -1,167 +1,41 @@
-% process_qsos_multiple_dlas_meanflux: run DLA detection algorithm on specified objects
+% process_a_qso_multiple_dlas_meanflux: run DLA detection algorithm on a specified object
 % while using lower lognhi range (defined in set_lls_parameters.m) as an alternative model; 
 % Note: model_posterior(quasar_ind, :) ... 
 % = [p(no dla | D), p(lls | D), p(1 dla | D), p(2 dla | D), ...]
 % also note that we should treat lls as no dla. 
-%
-% For higher order of DLA models, we consider the Occam's Razor
-% effect due to normalisation in the higher dimensions of the parameter space.
-%
-% We implement exp(-optical_depth) to the mean-flux
-%   µ(z) := µ * exp( - τ (1 + z)^β ) ; 
-%   1 + z = lambda_obs / lambda_lya
-% the prior of τ and β are taken from Kim, et al. (2007). 
-%
-% Nov 12, 2019: We added Lyman beta absorbers in the effective optical depth
-%  optical_depth := τ (1 + z_a)^β + τ_b (1 + z_b)^β
-%  τ_b     = τ f31 λ31 / ( f21 λ21 )
-%  1 + z_a = λobs / λ_lya
-%  1 + z_b = λobs / λ_lyb = λ_lya / λ_lyb  (1 + z_a) 
-% 
-% Nov 18, 2019: add all Lyman series to the effective optical depth
-%   effective_optical_depth := ∑ τ fi1 λi1 / ( f21 λ21 ) * ( 1 + z_i1 )^β
-%  where 
-%   1 + z_i1 =  λobs / λ_i1 = λ_lya / λ_i1 *  (1 + z_a)
-% Dec 25, 2019: add Lyman series to the noise variance training
-%   s(z)     = 1 - exp(-effective_optical_depth) + c_0 
-% 
-% March 8, 2019: add additional Occam's razor factor between DLA models and null model:
-%   P(DLAs | D) := P(DLAs | D) / num_dla_samples
 
-% multi-dlas parameters
-max_dlas = 4;
-min_z_separation = kms_to_z(3000);
+thing_ids = catalog.thing_ids(test_ind);
 
-% the mean values of Kim's effective optical depth
-tau_0_mu    = 0.0023;
-tau_0_sigma = 0.0007;
-beta_mu     = 3.65;
-beta_sigma  = 0.21;
+% change min z to lyb
+min_z_dla = @(wavelengths, z_qso) ...         % determines minimum z_DLA to search
+    max(min(wavelengths) / lya_wavelength - 1,                          ...
+        observed_wavelengths(lyb_wavelength, z_qso) / lya_wavelength - 1 + ...
+        min_z_cut);
 
-% load redshifts/DLA flags from training release
-prior_catalog = ...
-    load(sprintf('%s/catalog', processed_directory(prior_release)));
+[vals, selected_quasar_inds]= intersect(thing_ids, selected_thing_ids, 'stable');
+selected_thing_ids = vals; % update the vals since the ordering would change
 
-if (ischar(prior_ind))
-  prior_ind = eval(prior_ind);
-end
-
-prior.z_qsos  = prior_catalog.z_qsos(prior_ind);
-prior.dla_ind = prior_catalog.dla_inds(dla_catalog_name);
-prior.dla_ind = prior.dla_ind(prior_ind);
-
-% filter out DLAs from prior catalog corresponding to region of spectrum below
-% Ly∞ QSO rest
-prior.z_dlas = prior_catalog.z_dlas(dla_catalog_name);
-prior.z_dlas = prior.z_dlas(prior_ind);
-
-for i = find(prior.dla_ind)'
-  if (observed_wavelengths(lya_wavelength, prior.z_dlas{i}) < ...
-      observed_wavelengths(lyman_limit,    prior.z_qsos(i)))
-    prior.dla_ind(i) = false;
-  end
-end
-
-prior = rmfield(prior, 'z_dlas');
-
-% load QSO model from training release
-variables_to_load = {'rest_wavelengths', 'mu', 'M', 'log_omega', ...
-                     'log_c_0', 'log_tau_0', 'log_beta'};
-load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d', ...
-             processed_directory(training_release),                 ...
-             training_set_name,                                     ...
-             int64(min_lambda), int64(max_lambda)),                 ...
-     variables_to_load{:});
-
-% load DLA samples from training release
-variables_to_load = {'offset_samples', 'log_nhi_samples', 'nhi_samples'};
-load(sprintf('%s/dla_samples_a03', processed_directory(prior_release)), ...
-     variables_to_load{:});
-
-% load redshifts from catalog to process
-catalog = load(sprintf('%s/catalog', processed_directory(release)));
-
-% load preprocessed QSOs
-variables_to_load = {'all_wavelengths', 'all_flux', 'all_noise_variance', ...
-                     'all_pixel_mask'};
-load(sprintf('%s/preloaded_qsos', processed_directory(release)), ...
-     variables_to_load{:});
-
-% enable processing specific QSOs via setting to_test_ind
-if (ischar(test_ind))
-  test_ind = eval(test_ind);
-end
-
-fprintf_debug('Debug:real size of the full data set: %i\n', sum(test_ind))
-
-all_wavelengths    =    all_wavelengths(test_ind);
-all_flux           =           all_flux(test_ind);
-all_noise_variance = all_noise_variance(test_ind);
-all_pixel_mask     =     all_pixel_mask(test_ind);
-
-z_qsos = catalog.z_qsos(test_ind);
-
-% num_quasars = numel(z_qsos);
-
-% preprocess model interpolants
-mu_interpolator = ...
-    griddedInterpolant(rest_wavelengths,        mu,        'linear');
-M_interpolator = ...
-    griddedInterpolant({rest_wavelengths, 1:k}, M,         'linear');
-log_omega_interpolator = ...
-    griddedInterpolant(rest_wavelengths,        log_omega, 'linear');
-
-% initialize results
-min_z_dlas                 = nan(num_quasars, 1);
-max_z_dlas                 = nan(num_quasars, 1);
-log_priors_no_dla          = nan(num_quasars, 1);
-log_priors_dla             = nan(num_quasars, max_dlas);
-log_likelihoods_no_dla     = nan(num_quasars, 1);
-sample_log_likelihoods_dla = nan(num_quasars, num_dla_samples, max_dlas);
-base_sample_inds           = zeros(num_quasars, num_dla_samples, max_dlas - 1, 'uint32');
-log_likelihoods_dla        = nan(num_quasars, max_dlas);
-log_posteriors_no_dla      = nan(num_quasars, 1);
-log_posteriors_dla         = nan(num_quasars, max_dlas);
-
-% initialize lls results
-log_likelihoods_lls        = nan(num_quasars, 1);
-log_posteriors_lls         = nan(num_quasars, 1);
-log_priors_lls             = nan(num_quasars, 1);
-sample_log_likelihoods_lls = nan(num_quasars, num_dla_samples);
-
-% save maps: add the initilizations of MAP values
-% N * (1~k models) * (1~k MAP dlas)
-MAP_z_dlas   = nan(num_quasars, max_dlas, max_dlas);
-MAP_log_nhis = nan(num_quasars, max_dlas, max_dlas);
-MAP_inds     = nan(num_quasars, max_dlas, max_dlas);
-
-
-c_0   = exp(log_c_0);
-tau_0 = exp(log_tau_0);
-beta  = exp(log_beta);
-
-% handle the inds of empty spectra
-all_exceptions = nan(num_quasars, 1);
-
-for quasar_ind = 1:num_quasars
+for i = 1:numel(selected_thing_ids)
   tic;
   rng('default');  % random number should be set for each qso run
 
-  % add the offset of quasar index
-  quasar_ind_offset = quasar_ind + qsos_num_offset;
+  quasar_ind = selected_quasar_inds(i);
 
   % initialize an empty array for this sample log likelihood
   this_sample_log_likelihoods_dla = nan(num_dla_samples, max_dlas);
 
-  z_qso = z_qsos(quasar_ind_offset);
+  z_qso = z_qsos(quasar_ind);
 
   fprintf('processing quasar %i/%i (z_QSO = %0.4f) ...', ...
-        quasar_ind_offset, num_quasars + qsos_num_offset, z_qso);
+        quasar_ind, num_quasars, z_qso);
 
-  this_wavelengths    =    all_wavelengths{quasar_ind_offset};
-  this_flux           =           all_flux{quasar_ind_offset};
-  this_noise_variance = all_noise_variance{quasar_ind_offset};
-  this_pixel_mask     =     all_pixel_mask{quasar_ind_offset};
+  this_wavelengths    =    all_wavelengths{quasar_ind};
+  this_flux           =           all_flux{quasar_ind};
+  this_noise_variance = all_noise_variance{quasar_ind};
+  this_pixel_mask     =     all_pixel_mask{quasar_ind};
+
+  % saving index set to 1
+  quasar_ind = 1;
 
   % convert to QSO rest frame
   this_rest_wavelengths = emitted_wavelengths(this_wavelengths, z_qso);
@@ -179,6 +53,20 @@ for quasar_ind = 1:num_quasars
   this_rest_wavelengths = this_rest_wavelengths(ind);
   this_flux             =             this_flux(ind);
   this_noise_variance   =   this_noise_variance(ind);
+
+  this_lya_zs = ...
+      (this_wavelengths - lya_wavelength) / ...
+      lya_wavelength;
+
+  % To count the effect of Lyman series from higher z,
+  % we compute the absorbers' redshifts for all members of the series
+  this_lyseries_zs = nan(numel(this_wavelengths), num_forest_lines);
+  
+  for l = 1:num_forest_lines
+    this_lyseries_zs(:, l) = ...
+      (this_wavelengths - all_transition_wavelengths(l)) / ...
+      all_transition_wavelengths(l);    
+  end
 
   % DLA existence prior
   less_ind = (prior.z_qsos < (z_qso + prior_z_qso_increase));
@@ -234,29 +122,61 @@ for quasar_ind = 1:num_quasars
   this_log_omega = log_omega_interpolator(this_rest_wavelengths);
   this_omega2 = exp(2 * this_log_omega);
 
-  % set Lyseries absorber redshift for mean-flux suppression
-  % apply the lya_absorption after the interpolation because NaN will appear in this_mu
-  total_optical_depth = effective_optical_depth(this_wavelengths, ...
-      beta_mu, tau_0_mu, z_qso, ...
-      all_transition_wavelengths, all_oscillator_strengths, ...
-      num_forest_lines);
+  % Lyman series absorption effect for the noise variance
+  % Note: this noise variance must be trained on the same number of members of Lyman series
+  % Note: this_wavelengths is within (min_lambda, max_lambda)
+  % so it may beyond lya_wavelength, so need an indicator;
+  % Note: 1 - exp( -0 ) + c_0 = c_0
+  indicator         = this_lya_zs <= z_qso;
+  this_lya_zs       = this_lya_zs .* indicator;
+  lya_optical_depth = tau_0 .* (1 + this_lya_zs).^beta;
 
-  % total absorption effect of Lyseries absorption on the mean-flux
+  for l = 2:num_forest_lines
+    lyman_1pz = all_transition_wavelengths(1) .* (1 + this_lya_zs) ...
+        ./ all_transition_wavelengths(l);
+
+    % only include the Lyman series with absorber redshifts lower than z_qso
+    indicator = lyman_1pz <= (1 + z_qso);
+    lyman_1pz = lyman_1pz .* indicator;
+
+    tau = tau_0 * all_transition_wavelengths(l) * all_oscillator_strengths(l) ...
+        / (  all_transition_wavelengths(1) * all_oscillator_strengths(1) );
+
+    lya_optical_depth = lya_optical_depth + tau .* lyman_1pz.^beta;
+  end
+
+  this_scaling_factor = 1 - exp( -lya_optical_depth ) + c_0;
+
+  this_omega2 = this_omega2 .* this_scaling_factor.^2;
+
+  % Lyman series absorption effect on the mean-flux
+  % apply the lya_absorption after the interpolation because NaN will appear in this_mu
+  total_optical_depth = nan(numel(this_wavelengths), num_forest_lines);
+
+  for l = 1:num_forest_lines
+    % calculate the oscillator strength for this lyman series member
+    this_tau_0 = tau_0_mu * ...
+      all_oscillator_strengths(l)   / lya_oscillator_strength * ...
+      all_transition_wavelengths(l) / lya_wavelength;
+    
+    total_optical_depth(:, l) = ...
+      this_tau_0 .* ( (1 + this_lyseries_zs(:, l)).^beta_mu );
+
+    % indicator function: z absorbers <= z_qso
+    % here is different from multi-dla processing script
+    % I choose to use zero instead or nan to indicate
+    % values outside of the Lyman forest
+    indicator = this_lyseries_zs(:, l) <= z_qso;
+    total_optical_depth(:, l) = total_optical_depth(:, l) .* indicator;
+  end
+
+  % change from nansum to simply sum; shoudn't be different
+  % because we also change indicator from nan to zero,
+  % but if this script is glitchy then inspect this line
   lya_absorption = exp(- sum(total_optical_depth, 2) );
   
   this_mu = this_mu .* lya_absorption;
   this_M  = this_M  .* lya_absorption;
-
-  % set another Lysieres absorber redshift to use in coveriance
-  lya_optical_depth = effective_optical_depth(this_wavelengths, ...
-      beta, tau_0, z_qso, ...
-      all_transition_wavelengths, all_oscillator_strengths, ...
-      num_forest_lines);
-
-  this_scaling_factor = 1 - exp( -sum(lya_optical_depth, 2) ) + c_0;
-
-  % this is the omega included the Lyseries
-  this_omega2 = this_omega2 .* this_scaling_factor.^2;
 
   % re-adjust (K + Ω) to the level of μ .* exp( -optical_depth ) = μ .* a_lya
   % now the null model likelihood is:
@@ -470,33 +390,3 @@ model_posteriors = ...
 p_no_dlas = model_posteriors(:, 1);
 p_lls     = model_posteriors(:, 2);
 p_dlas    = 1 - p_no_dlas - p_lls;
-
-% save results
-variables_to_save = {'training_release', 'prior_release', 'training_set_name', ...
-                     'dla_catalog_name', 'prior_ind', 'release', ...
-                     'test_set_name', 'prior_z_qso_increase', 'k', ...
-                     'normalization_min_lambda', 'normalization_max_lambda', ...
-                     'min_z_cut', 'max_z_cut', 'num_dla_samples', ...
-                     'num_lines', 'min_z_dlas', 'max_z_dlas', ...
-                     'sample_log_likelihoods_dla', 'base_sample_inds', ...
-                     'log_priors_no_dla', 'log_priors_dla', 'log_priors_lls', ...
-                     'log_likelihoods_no_dla', 'MAP_z_dlas', 'MAP_log_nhis', ...
-                     'log_likelihoods_dla', 'log_likelihoods_lls', ...
-                     'log_posteriors_no_dla', 'log_posteriors_dla', 'log_posteriors_lls', ...
-                     'model_posteriors', 'p_no_dlas', 'p_dlas', 'p_lls', ...
-                     'all_exceptions', 'sample_log_likelihoods_lls'};
-
-if (exist('test_ind', 'var'))
-  filename = sprintf('%s/processed_qsos_multi_meanflux%s_%d-%d', ...
-                     processed_directory(release), ...
-                     test_set_name, ...
-                     qsos_num_offset, qsos_num_offset + num_quasars);
-
-  variables_to_save{end + 1} = 'test_ind';
-else
-  filename = sprintf('%s/processed_qsos_multi_meanflux_%d_%d', ...
-                     processed_directory(release), ...
-                     qsos_num_offset, qsos_num_offset + num_quasars);
-end
-
-save(filename, variables_to_save{:}, '-v7.3');
