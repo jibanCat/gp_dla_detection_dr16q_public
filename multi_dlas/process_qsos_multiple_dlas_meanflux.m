@@ -10,7 +10,7 @@
 % We implement exp(-optical_depth) to the mean-flux
 %   µ(z) := µ * exp( - τ (1 + z)^β ) ; 
 %   1 + z = lambda_obs / lambda_lya
-% the prior of τ and β are taken from Kim, et al. (2007). 
+% the prior of τ and β are taken from Kamble, et al. (2019) BOSS DR12Q prior.
 %
 % Nov 12, 2019: We added Lyman beta absorbers in the effective optical depth
 %  optical_depth := τ (1 + z_a)^β + τ_b (1 + z_b)^β
@@ -32,11 +32,11 @@
 max_dlas = 4;
 min_z_separation = kms_to_z(3000);
 
-% the mean values of Kim's effective optical depth
-tau_0_mu    = 0.0023;
-tau_0_sigma = 0.0007;
-beta_mu     = 3.65;
-beta_sigma  = 0.21;
+% Kamble 2019 values
+tau_0_mu    = 0.00554;
+tau_0_sigma = 0.00064;
+beta_mu     =   3.182;
+beta_sigma  =   0.074;
 
 % load redshifts/DLA flags from training release
 prior_catalog = ...
@@ -67,7 +67,7 @@ prior = rmfield(prior, 'z_dlas');
 % load QSO model from training release
 variables_to_load = {'rest_wavelengths', 'mu', 'M', 'log_omega', ...
                      'log_c_0', 'log_tau_0', 'log_beta'};
-load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d', ...
+load(sprintf('%s/learned_qso_model_lyseries_variance_boss_%s_%d-%d', ...
              processed_directory(training_release),                 ...
              training_set_name,                                     ...
              int64(min_lambda), int64(max_lambda)),                 ...
