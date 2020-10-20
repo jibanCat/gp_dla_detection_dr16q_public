@@ -35,6 +35,17 @@ tau_0_mu    = 0.0023;
 tau_0_sigma = 0.0007;
 beta_mu     = 3.65;
 beta_sigma  = 0.21;
+% % Kamble 2019 values
+% tau_0_mu    = 0.00554;
+% tau_0_sigma = 0.00064;
+% beta_mu     =   3.182;
+% beta_sigma  =   0.074;
+% % Becker 2013
+% tau_0_mu    = 0.0097;
+% tau_0_sigma = 0.0021;
+% beta_mu     =   2.90;
+% beta_sigma  =   0.12;
+
 
 % load redshifts/DLA flags from training release
 prior_catalog = ...
@@ -65,7 +76,7 @@ prior = rmfield(prior, 'z_dlas');
 % load QSO model from training release
 variables_to_load = {'rest_wavelengths', 'mu', 'M', 'log_omega', ...
                      'log_c_0', 'log_tau_0', 'log_beta'};
-load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d_zbest', ...
+load(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d', ...
              processed_directory(training_release),                 ...
              training_set_name,                                     ...
              int64(min_lambda), int64(max_lambda)),                 ...
