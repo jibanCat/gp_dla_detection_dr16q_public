@@ -38,9 +38,13 @@ k                  = 20;                      % rank of non-diagonal contributio
 max_noise_variance = 3^2;                     % maximum pixel noise allowed during model training
 
 % optimization parameters
+% tau_0_mu    = 0.00554;
+% tau_0_sigma = 0.00064;
+% beta_mu     =   3.182;
+% beta_sigma  =   0.074;
 initial_c_0   = 0.1;                          % initial guess for c₀
-initial_tau_0 = 0.0023;                       % initial guess for τ₀
-initial_beta  = 3.65;                         % initial guess for β
+initial_tau_0 = 0.00554;                      % initial guess for τ₀
+initial_beta  = 3.182;                        % initial guess for β
 minFunc_options =               ...           % optimization options for model fitting
     struct('MaxIter',     2000, ...
            'MaxFunEvals', 4000);
