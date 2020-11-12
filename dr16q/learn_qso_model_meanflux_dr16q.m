@@ -172,8 +172,10 @@ end
 
 clear('all_lyman_1pzs');
 
-sum_inverse_variance = nansum(1 / rest_noise_variances_exp1pz);
-mu = nansum(rest_fluxes_div_exp1pz / rest_noise_variances_exp1pz) / sum_inverse_variance;
+sum_inverse_variance = nansum(1 ./ rest_noise_variances_exp1pz);
+mu = nansum(rest_fluxes_div_exp1pz ./ rest_noise_variances_exp1pz) ./ sum_inverse_variance;
+fprintf('Size of sum(1 ./ noise_variance) is %d %d', size(sum_inverse_variance))
+fprintf('Size of mu is %d %d', size(mu))
 
 % temp save mu vector for checking
 variables_to_save = {'training_release', 'train_ind', 'max_noise_variance', ...
