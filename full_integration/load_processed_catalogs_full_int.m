@@ -4,6 +4,9 @@
 addpath multi_dlas
 set_parameters_multi;
 
+% this should be longer in the future
+num_optical_depth_samples = num_dla_samples;
+
 % prior settings
 % specify the learned quasar model to use
 training_release  = 'dr16q';                % where the leanrned file is
@@ -84,13 +87,15 @@ load(sprintf('%s/learned_qso_model_lyseries_variance_wmu_boss_%s_%d-%d', ...
 
 % load DLA samples from training release
 variables_to_load = {'offset_samples', 'log_nhi_samples', 'nhi_samples'};
-load(sprintf('%s/dla_samples_a03', processed_directory(prior_release)), ...
+load(sprintf('%s/dla_samples_a03_%d', processed_directory(prior_release), ...
+     num_dla_samples), ...
      variables_to_load{:});
 
 % load null model optical depth samples
 variables_to_save = {'tau_0_samples', 'tau_0_mu', 'tau_0_sigma', ...
                      'beta_samples',  'beta_mu',  'beta_sigma'};
-load(sprintf('%s/tau_0_samples', processed_directory(prior_release)), ...
+load(sprintf('%s/tau_0_samples_%d', processed_directory(prior_release), ...
+     num_optical_depth_samples), ...
      variables_to_save{:});
 
 % load redshifts from catalog to process

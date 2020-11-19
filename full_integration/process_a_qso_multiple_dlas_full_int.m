@@ -1,4 +1,4 @@
-% process_a_qso_multiple_dlas_meanflux: run DLA detection algorithm on a specified object
+% process_a_qso_multiple_dlas_full_int: run DLA detection algorithm on a specified object
 % while using lower lognhi range (defined in set_lls_parameters.m) as an alternative model;
 %
 % Usage:
@@ -99,137 +99,7 @@ for i = 1:numel(selected_thing_ids)
   fprintf_debug(' ...     p(no DLA  | z_QSO)       : %0.3f\n', exp(log_priors_no_dla(quasar_ind)) );
   fprintf_debug(' ...     p(sub DLA | z_QSO)       : %0.3f\n', exp(log_priors_lls(quasar_ind)) );
 
-  % interpolate model onto given wavelengths
-  % error will appear if the input spectrum is empty
-  try
-    this_mu = mu_interpolator( this_rest_wavelengths);
-    this_M  =  M_interpolator({this_rest_wavelengths, 1:k});
-  catch me
-    if (strcmp(me.identifier, 'MATLAB:griddedInterpolant:NonVecCompVecErrId'))
-      all_exceptions(quasar_ind, 1) = 1;
-      fprintf(' took %0.3fs.\n', toc);      
-      continue
-    else
-      rethrow(me)
-    end
-  end
-
-  this_log_omega = log_omega_interpolator(this_rest_wavelengths);
-  this_omega2 = exp(2 * this_log_omega);
-
-  % [sample optical depth] sampling the effective optical depth, find MAP
-  parfor j = 1:num_optical_depth_samples
-
-    this_omega2_kim = this_omega2;
-    this_mu_kim     = this_mu;
-    this_M_kim      = this_M;
-
-    % set Lyseries absorber redshift for mean-flux suppression
-    % apply the lya_absorption after the interpolation because NaN will appear in this_mu
-    total_optical_depth = effective_optical_depth(this_wavelengths, ...
-        beta_mu, tau_0_samples(j), z_qso, ...
-        all_transition_wavelengths, all_oscillator_strengths, ...
-        num_forest_lines);
-
-    % total absorption effect of Lyseries absorption on the mean-flux
-    lya_absorption = exp(- sum(total_optical_depth, 2) );
-
-    this_mu_kim = this_mu_kim .* lya_absorption;
-    this_M_kim  = this_M_kim  .* lya_absorption;
-
-    % set another Lysieres absorber redshift to use in coveriance
-    lya_optical_depth = effective_optical_depth(this_wavelengths, ...
-        beta, tau_0, z_qso, ...
-        all_transition_wavelengths, all_oscillator_strengths, ...
-        num_forest_lines);
-
-    this_scaling_factor = 1 - exp( -sum(lya_optical_depth, 2) ) + c_0;
-
-    % this is the omega included the Lyseries
-    this_omega2_kim = this_omega2_kim .* this_scaling_factor.^2;
-
-    % re-adjust (K + Ω) to the level of μ .* exp( -optical_depth ) = μ .* a_lya
-    % now the null model likelihood is:
-    % p(y | λ, zqso, v, ω, M_nodla) = N(y; μ .* a_lya, A_lya (K + Ω) A_lya + V)
-    this_omega2_kim = this_omega2_kim .* lya_absorption.^2;
-
-    % baseline: probability of no DLA model
-    sample_kim_log_likelihoods(quasar_ind, j) = ...
-      log_mvnpdf_low_rank(this_flux, this_mu_kim, this_M_kim, ...
-          this_omega2_kim + this_noise_variance);
-  end
-
-  % [MAP optical depth]
-  [~, maxidx] = nanmax(sample_kim_log_likelihoods(quasar_ind, :));
-  tau_0_map   = tau_0_samples(maxidx);
-%   beta_map    = beta_samples(maxidx);
-  fprintf_debug('tau_0_map : %0.5f\n', ...
-                tau_0_map);
-
-  % set Lyseries absorber redshift for mean-flux suppression
-  % apply the lya_absorption after the interpolation because NaN will appear in this_mu
-  total_optical_depth = effective_optical_depth(this_wavelengths, ...
-      beta_mu, tau_0_map, z_qso, ...
-      all_transition_wavelengths, all_oscillator_strengths, ...
-      num_forest_lines);
-
-  % total absorption effect of Lyseries absorption on the mean-flux
-  lya_absorption = exp(- sum(total_optical_depth, 2) );  
-
-  this_mu = this_mu .* lya_absorption;
-  this_M  = this_M  .* lya_absorption;
-
-  % set another Lysieres absorber redshift to use in coveriance
-  lya_optical_depth = effective_optical_depth(this_wavelengths, ...
-      beta, tau_0, z_qso, ...
-      all_transition_wavelengths, all_oscillator_strengths, ...
-      num_forest_lines);
-
-  this_scaling_factor = 1 - exp( -sum(lya_optical_depth, 2) ) + c_0;
-
-  % this is the omega included the Lyseries
-  this_omega2 = this_omega2 .* this_scaling_factor.^2;
-
-  % re-adjust (K + Ω) to the level of μ .* exp( -optical_depth ) = μ .* a_lya
-  % now the null model likelihood is:
-  % p(y | λ, zqso, v, ω, M_nodla) = N(y; μ .* a_lya, A_lya (K + Ω) A_lya + V)
-  this_omega2 = this_omega2 .* lya_absorption.^2;
-
-%   % [Kim prior variance] create an additional prior for the variance in
-%   % Kim's prior for mean-flux suppression
-%   optical_depth_mu = effective_optical_depth(this_wavelengths, ...
-%       beta_mu, tau_0_mu, z_qso, ...
-%       all_transition_wavelengths, all_oscillator_strengths, ...
-%       num_forest_lines);
-%   optical_depth_lower = effective_optical_depth(this_wavelengths, ...
-%       beta_mu + beta_sigma, tau_0_mu + tau_0_sigma, z_qso, ...
-%       all_transition_wavelengths, all_oscillator_strengths, ...
-%       num_forest_lines);
-%   optical_depth_upper = effective_optical_depth(this_wavelengths, ...
-%       beta_mu - beta_sigma, tau_0_mu - tau_0_sigma, z_qso, ...
-%       all_transition_wavelengths, all_oscillator_strengths, ...
-%       num_forest_lines);
-%   lya_absorption_mu    = exp( -sum(optical_depth_mu, 2) );
-%   lya_absorption_lower = exp( -sum(optical_depth_lower, 2) );
-%   lya_absorption_upper = exp( -sum(optical_depth_upper, 2) );
-%   % approximate the variance by taking the maximum
-%   this_meanflux_variance = max(...
-%     abs(lya_absorption_mu - lya_absorption_lower), ...
-%     abs(lya_absorption_upper - lya_absorption_mu));
-%   this_meanflux_variance = this_meanflux_variance.^2;
-%   this_omega2 = this_omega2 + this_meanflux_variance
-
-  % baseline: probability of no DLA model
-  log_likelihoods_no_dla(quasar_ind) = ...
-      log_mvnpdf_low_rank(this_flux, this_mu, this_M, ...
-          this_omega2 + this_noise_variance);
-
-  log_posteriors_no_dla(quasar_ind) = ...
-      log_priors_no_dla(quasar_ind) + log_likelihoods_no_dla(quasar_ind);
-
-  fprintf_debug(' ... log p(  D  | z_QSO, no DLA ) : %0.2f\n', ...
-                log_likelihoods_no_dla(quasar_ind));
-
+  % DLA sampling prior
   min_z_dlas(quasar_ind) = min_z_dla(this_wavelengths, z_qso);
   max_z_dlas(quasar_ind) = max_z_dla(this_wavelengths, z_qso);
 
@@ -261,10 +131,97 @@ for i = 1:numel(selected_thing_ids)
   % been applied this_pixel_mask.
   mask_ind = (~this_pixel_mask(unmasked_ind));
 
+  % interpolate model onto given wavelengths
+  % error will appear if the input spectrum is empty
+  try
+    this_mu = mu_interpolator( this_rest_wavelengths);
+    this_M  =  M_interpolator({this_rest_wavelengths, 1:k});
+  catch me
+    if (strcmp(me.identifier, 'MATLAB:griddedInterpolant:NonVecCompVecErrId'))
+      all_exceptions(quasar_ind, 1) = 1;
+      fprintf(' took %0.3fs.\n', toc);      
+      continue
+    else
+      rethrow(me)
+    end
+  end
+
+  this_log_omega = log_omega_interpolator(this_rest_wavelengths);
+  this_omega2 = exp(2 * this_log_omega);
+
+  % set another Lysieres absorber redshift to use in coveriance
+  lya_optical_depth = effective_optical_depth(this_wavelengths, ...
+      beta, tau_0, z_qso, ...
+      all_transition_wavelengths, all_oscillator_strengths, ...
+      num_forest_lines);
+
+  this_scaling_factor = 1 - exp( -sum(lya_optical_depth, 2) ) + c_0;
+
+  % this is the omega included the Lyseries
+  this_omega2 = this_omega2 .* this_scaling_factor.^2;
+
+  % [effective optical depth] saving into a large array
+  [num_pixels, ~] = size(this_wavelengths);
+  all_lya_absorption = nan(num_pixels, num_optical_depth_samples);
+
+  % [sample optical depth] sampling the effective optical depth, find MAP
+  parfor j = 1:num_optical_depth_samples
+
+    this_omega2_kim = this_omega2;
+    this_mu_kim     = this_mu;
+    this_M_kim      = this_M;
+
+    % set Lyseries absorber redshift for mean-flux suppression
+    % apply the lya_absorption after the interpolation because NaN will appear in this_mu
+    total_optical_depth = effective_optical_depth(this_wavelengths, ...
+        beta_samples(j), tau_0_samples(j), z_qso, ...
+        all_transition_wavelengths, all_oscillator_strengths, ...
+        num_forest_lines);
+
+    % total absorption effect of Lyseries absorption on the mean-flux
+    lya_absorption = exp(- sum(total_optical_depth, 2) );
+
+    all_lya_absorption(:, j) = lya_absorption(:, 1);
+
+    this_mu_kim = this_mu_kim .* lya_absorption;
+    this_M_kim  = this_M_kim  .* lya_absorption;
+
+    % re-adjust (K + Ω) to the level of μ .* exp( -optical_depth ) = μ .* a_lya
+    % now the null model likelihood is:
+    % p(y | λ, zqso, v, ω, M_nodla) = N(y; μ .* a_lya, A_lya (K + Ω) A_lya + V)
+    this_omega2_kim = this_omega2_kim .* lya_absorption.^2;
+
+    % baseline: probability of no DLA model
+    sample_kim_log_likelihoods(quasar_ind, j) = ...
+      log_mvnpdf_low_rank(this_flux, this_mu_kim, this_M_kim, ...
+          this_omega2_kim + this_noise_variance);
+  end
+
+  % baseline: probability of no DLA model
+
+  max_log_likelihood = ...
+    nanmax(sample_kim_log_likelihoods(quasar_ind, :));
+
+  sample_probabilities = ...
+    exp(sample_kim_log_likelihoods(quasar_ind, :) - ...
+        max_log_likelihood);
+
+  log_likelihoods_no_dla(quasar_ind) = ...
+    max_log_likelihood + log(nanmean(sample_probabilities));
+
+  log_posteriors_no_dla(quasar_ind) = ...
+      log_priors_no_dla(quasar_ind) + log_likelihoods_no_dla(quasar_ind);
+
+  fprintf_debug(' ... log p(  D  | z_QSO, no DLA ) : %0.2f\n', ...
+                log_likelihoods_no_dla(quasar_ind));
+
   for num_dlas = 1:max_dlas
     % compute probabilities under DLA model for each of the sampled
     % (normalized offset, log(N HI)) pairs
     parfor i = 1:num_dla_samples
+      % [sampling optical depth]
+      lya_absorption =  all_lya_absorption(:, i);
+
       % absorption corresponding to this sample
       absorption = voigt(padded_wavelengths, sample_z_dlas(i), ...
                          nhi_samples(i), num_lines);
@@ -286,6 +243,11 @@ for i = 1:numel(selected_thing_ids)
       dla_M      = this_M      .* absorption;
       dla_omega2 = this_omega2 .* absorption.^2;
 
+      % [sampling optical depth]
+      dla_mu     = dla_mu      .* lya_absorption;
+      dla_M      = dla_M       .* lya_absorption;
+      dla_omega2 = dla_omega2  .* lya_absorption.^2;
+
       this_sample_log_likelihoods_dla(i, num_dlas) = ...
         log_mvnpdf_low_rank(this_flux, dla_mu, dla_M, ...
             dla_omega2 + this_noise_variance) - log(num_dla_samples);
@@ -305,6 +267,11 @@ for i = 1:numel(selected_thing_ids)
         lls_mu     = this_mu     .* absorption;
         lls_M      = this_M      .* absorption;
         lls_omega2 = this_omega2 .* absorption.^2;
+
+        % [sampling optical depth]
+        lls_mu     = lls_mu      .* lya_absorption;
+        lls_M      = lls_M       .* lya_absorption;
+        lls_omega2 = lls_omega2  .* lya_absorption.^2;
 
         sample_log_likelihoods_lls(quasar_ind, i) = ...
           log_mvnpdf_low_rank(this_flux, lls_mu, lls_M, ...
