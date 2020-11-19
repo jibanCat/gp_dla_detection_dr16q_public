@@ -1,8 +1,6 @@
 % generate_optical_depth_samples_full_int.m : generate samples for (tau_0, beta)
 % in a bivariate normal distribution with a diagonal covariance
 
-num_optical_depth_samples = 10000;
-
 % the mean values of Kim's effective optical depth
 tau_0_mu    = 0.00554;
 tau_0_sigma = 0.00064;

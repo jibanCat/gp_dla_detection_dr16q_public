@@ -5,7 +5,7 @@ addpath multi_dlas
 set_parameters_multi;
 
 % this should be longer in the future
-num_optical_depth_samples = num_dla_samples;
+assert(num_optical_depth_samples == num_dla_samples);
 
 % prior settings
 % specify the learned quasar model to use
