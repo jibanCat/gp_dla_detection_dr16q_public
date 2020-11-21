@@ -137,8 +137,9 @@ end
 
 % find empirical mean vector:
 % reverse the rest_fluxes back to the fluxes before encountering Lyα forest
-prev_tau_0 = 0.0023; % Kim et al. (2007) priors
-prev_beta  = 3.65;
+% Kamble 2019 values
+prev_tau_0    = 0.00554;
+prev_beta     =   3.182;
 
 rest_fluxes_div_exp1pz      = nan(num_quasars, num_rest_pixels);
 rest_noise_variances_exp1pz = nan(num_quasars, num_rest_pixels);
@@ -171,7 +172,21 @@ end
 
 clear('all_lyman_1pzs');
 
-mu = nanmean(rest_fluxes_div_exp1pz);
+sum_inverse_variance = nansum(1 ./ rest_noise_variances_exp1pz);
+mu = nansum(rest_fluxes_div_exp1pz ./ rest_noise_variances_exp1pz) ./ sum_inverse_variance;
+fprintf('Size of sum(1 ./ noise_variance) is %d %d', size(sum_inverse_variance))
+fprintf('Size of mu is %d %d', size(mu))
+
+% temp save mu vector for checking
+variables_to_save = {'training_release', 'train_ind', 'max_noise_variance', ...
+                     'minFunc_options', 'rest_wavelengths', 'mu'};
+
+save(sprintf('%s/learned_wmu_boss_%s_%d-%d',          ...
+             processed_directory(training_release), ...
+             training_set_name, ...
+             int64(min_lambda), int64(max_lambda)), ...
+     variables_to_save{:}, '-v7.3');
+
 centered_rest_fluxes = bsxfun(@minus, rest_fluxes_div_exp1pz, mu);
 clear('rest_fluxes', 'rest_fluxes_div_exp1pz');
 
@@ -237,7 +252,7 @@ variables_to_save = {'training_release', 'train_ind', 'max_noise_variance', ...
                      'log_c_0', 'log_tau_0', 'log_beta', 'log_likelihood', ...
                      'minFunc_output'};
 
-save(sprintf('%s/learned_qso_model_lyseries_variance_kim_%s_%d-%d',             ...
+save(sprintf('%s/learned_qso_model_lyseries_variance_wmu_boss_%s_%d-%d',             ...
              processed_directory(training_release), ...
              training_set_name, ...
              int64(min_lambda), int64(max_lambda)), ...
