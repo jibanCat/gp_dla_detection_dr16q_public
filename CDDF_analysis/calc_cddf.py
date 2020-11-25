@@ -193,7 +193,11 @@ class DLACatalogue(object):
             )
             print(e)
             self.snrs = np.array(ff["snrs"])
-        assert np.sum(self.filehandle["test_ind"]) == np.shape(self.snrs)[0]
+        # [partial processed file but snrs not partial]
+        if self.snrs.shape[0] != self.real_index.shape[0]:
+            assert np.sum(self.filehandle["test_ind"]) == np.shape(self.snrs)[0]
+            print("[Warning] Reading only first {} snrs.".format(self.real_index.shape[0]))
+            self.snrs = self.snrs[:self.real_index.shape[0]]
 
         if self.filter_noisy_pixels:
             self.pixel_noise = np.array(
