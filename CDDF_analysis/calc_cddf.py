@@ -140,6 +140,20 @@ class DLACatalogue(object):
         self._z_max = self.filehandle["max_z_dlas"][0]
 
         self.test_ind = self.filehandle["test_ind"][0, :].astype(np.bool)
+        # Index of each spectrum in the file containing the flux: raw_file
+        # It's the indices we selected from `preloaded_qsos.mat` based on our `test_ind`
+        self.real_index = np.where(self.filehandle["test_ind"][0] != 0)[0]
+
+        # [partial file] if we are reading a partial processed file trim down
+        # the test_ind
+        if self._z_min.shape[0] != np.sum(self.test_ind):
+            print("[Warning] You have less samples in processed file than test_ind,")
+            print("          you are reading a partial file, otherwise, check your test_ind.")
+            size = self._z_min.shape[0]
+            self.test_ind[self.real_index[size:]] = False
+            self.real_index = np.nonzero(self.test_ind)[0]
+            assert self.real_index.shape[0] == self._z_min.shape[0]
+            print("[Info] Reading first {} spectra.".format(size))
 
         # # [max zDLA bug fix] replace the max lambda to zQSO. Assgin max lambda in below
         # self.max_z_dla_fix = max_z_dla_fix
@@ -163,9 +177,6 @@ class DLACatalogue(object):
         # the bug fix: could be removed in the future
         self._z_max = self.z_qsos - kms_to_z(3000)
 
-        # Index of each spectrum in the file containing the flux: raw_file
-        # It's the indices we selected from `preloaded_qsos.mat` based on our `test_ind`
-        self.real_index = np.where(self.filehandle["test_ind"][0] != 0)[0]
         # number of bins of dNdX or Omega_DLA to plot per unit z interval
         self.bins_per_z = 6
         # Exclude things which have a low SNR. This is tested to be converged on DR7.
