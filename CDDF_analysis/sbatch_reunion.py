@@ -76,9 +76,13 @@ def save2mat73(filename, out_filename, small_file=False, dla_nhi_cut=False, samp
 
     processed_file = {}
 
+    # small file checking conditions, discard vars if they are in this list
+    conds = ["sample_log_", "base_sample_inds", "sample_kim_log_likelihoods"]
+    check_conds = lambda key : any([cond in key for cond in conds])
+
     for key in f.keys():
         if small_file:
-            if "sample_log_likelihoods" in key or "base_sample_inds" in key:
+            if check_conds(key):
                 continue
         processed_file[u'{}'.format(key)] = np.transpose( f[key][()] )
 
