@@ -125,7 +125,7 @@ def do_snr_check(cat, subdir, z_dla_max = 5):
     first_snr = cat.snr_thresh
 
     # [CDDF]
-    cat.noterdaeme_12_data()
+    dla_data.noterdaeme_12_data()
     cat.set_snr(-2)
     cat.plot_cddf(zmax=z_dla_max, label="ALL GP")
     cat.set_snr(2)
