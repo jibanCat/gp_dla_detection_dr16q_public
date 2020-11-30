@@ -25,10 +25,10 @@ hold on
         s = scatter(sample_z_dlas, log_nhi_samples, 40, norm_sample_log_likelihoods, 'filled', 'DisplayName', 'sample likelihoods');
         s.MarkerFaceAlpha = 0.25;
         colorbar('southoutside');
-        title(sprintf('quasar ind = %d, z qso = %.2f', quasar_ind, z_qso)); 
+        title(sprintf('thingID = %d, zQSO = %.2f', selected_thing_ids, z_qso), 'FontSize', 20, 'Interpreter','latex');
         xlim([min(sample_z_dlas) max(sample_z_dlas)]);
-        xlabel('z_{dla1}');
-        ylabel('log NHI1');
+        xlabel('$z_{DLA1}$', 'FontSize', 20, 'Interpreter','latex');
+        ylabel('$\log N_{HI1}$', 'FontSize', 20, 'Interpreter','latex');
         caxis([-100 0]);
         num_dlas = find( model_posteriors(quasar_ind, :) >= 0.5) - 1 - 1; % -1 for null model -1 for sub_dlas
 
@@ -41,7 +41,7 @@ hold on
             end
 
             legend( [s s_roman], {'$p(\mathbf{y} \mid z_{DLA}, \log N_{HI}, \mathcal{M}_{DLA})$', 'This work'},...
-                'Interpreter','latex', 'FontSize', 14);
+                'Interpreter','latex', 'FontSize', 20);
         end
     hold off
 
@@ -80,15 +80,15 @@ hold on
         dla_omega2 = this_omega2 .* lya_absorption.^2;          
     end
 
-    subplot('position', [0.05 0.05 0.90 0.38]);
+    subplot('position', [0.05 0.06 0.90 0.38]);
     
     hold on
         this_z_dlas = (this_wavelengths / lya_wavelength) - 1;
         p_flux = plot(this_z_dlas, this_flux);
         xlim([min(sample_z_dlas) max(sample_z_dlas)]);
         ylim([-1     5]);
-        xlabel('(observed wavelengths $\lambda$ (\AA) / 1216 (\AA)) - 1', 'FontSize', 14, 'Interpreter','latex');
-        ylabel('normalized flux $\mathbf{y}$',                            'FontSize', 14, 'Interpreter','latex');
+        xlabel('(Observed Wavelengths $\lambda$ (\AA) / 1216 (\AA)) - 1', 'FontSize', 20, 'Interpreter','latex');
+        ylabel('Normalized Flux $\mathbf{y}$',                            'FontSize', 20, 'Interpreter','latex');
         p_dla = plot(this_z_dlas, dla_mu);
 
         plot( (1 + z_qso) * (rest_wavelengths / lya_wavelength) - 1, mu);
