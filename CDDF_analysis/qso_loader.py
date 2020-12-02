@@ -274,6 +274,11 @@ class QSOLoader(object):
             print(e)
             print("[Warning] You are reading the snrs file from calc_cddf.compute_all_snrs.")
             self.snrs         = self.snrs_file['snrs'][()] 
+        # [partial processed file but snrs not partial]
+        if self.snrs.shape[0] != self.test_real_index.shape[0]:
+            assert self.snrs.shape[0] == np.sum(self.processed_file['test_ind'][0, :].astype(np.bool))
+            print("[Warning] Reading only first {} snrs.".format(self.test_real_index.shape[0]))
+            self.snrs = self.snrs[:self.test_real_index.shape[0]]
 
         # store thing_ids based on test_set prior inds
         self.thing_ids = self.catalogue_file['thing_ids'][0, :].astype(np.int)

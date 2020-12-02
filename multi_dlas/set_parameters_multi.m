@@ -38,10 +38,6 @@ k                  = 20;                      % rank of non-diagonal contributio
 max_noise_variance = 3^2;                     % maximum pixel noise allowed during model training
 
 % optimization parameters
-% tau_0_mu    = 0.00554;
-% tau_0_sigma = 0.00064;
-% beta_mu     =   3.182;
-% beta_sigma  =   0.074;
 initial_c_0   = 0.1;                          % initial guess for c₀
 initial_tau_0 = 0.00554;                      % initial guess for τ₀
 initial_beta  = 3.182;                        % initial guess for β
@@ -50,12 +46,19 @@ minFunc_options =               ...           % optimization options for model f
            'MaxFunEvals', 4000);
 
 % DLA model parameters: parameter samples
-num_dla_samples     = 10000;                  % number of parameter samples
-alpha               = 0.97;                    % weight of KDE component in mixture
+num_dla_samples     = 30000;                  % number of parameter samples
+alpha               = 0.97;                   % weight of KDE component in mixture
 uniform_min_log_nhi = 20.0;                   % range of column density samples    [cm⁻²]
 uniform_max_log_nhi = 23.0;                   % from uniform distribution
 fit_min_log_nhi     = 20.0;                   % range of column density samples    [cm⁻²]
 fit_max_log_nhi     = 22.0;                   % from fit to log PDF
+
+% effective optical depth samples
+num_optical_depth_samples =   30000;          % number of parameter samples
+tau_0_mu                  = 0.00554;          % meanflux suppression for τ₀
+tau_0_sigma               = 0.00064;          % meanflux suppression for τ₀
+beta_mu                   =   3.182;          % meanflux suppression for β
+beta_sigma                =   0.074;          % meanflux suppression for β
 
 % model prior parameters
 prior_z_qso_increase = kms_to_z(30000);       % use QSOs with z < (z_QSO + x) for prior

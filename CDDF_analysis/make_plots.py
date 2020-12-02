@@ -123,6 +123,21 @@ def do_pixel_noise_check(cat, subdir, z_dla_max = 5):
 def do_snr_check(cat, subdir, z_dla_max = 5):
     """Check effect of removing spectra with a low SNR."""
     first_snr = cat.snr_thresh
+
+    # [CDDF]
+    dla_data.noterdaeme_12_data()
+    cat.set_snr(-2)
+    cat.plot_cddf(zmax=z_dla_max, label="ALL GP")
+    cat.set_snr(2)
+    cat.plot_cddf(zmax=z_dla_max, label="SNR > 2")
+    cat.set_snr(4)
+    cat.plot_cddf(zmax=z_dla_max, label="SNR > 4")
+    plt.xlim(1e20, 1e23)
+    plt.ylim(1e-28, 5e-21)
+    plt.legend(loc=0)
+    save_figure(path.join(subdir,"cddf_gp_snr"))
+    plt.clf()
+
     cat.set_snr(-2)
     cat.plot_omega_dla(zmax=z_dla_max,label="All GP")
     cat.set_snr(2)
