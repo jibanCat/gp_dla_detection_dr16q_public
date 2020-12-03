@@ -94,6 +94,7 @@ class DLACatalogue(object):
         z_dla_minimum: float = 0.1,
         raw_distfile: str = "DR16Q_v4.fits",  # DR16Q only
         zestimate_cut: bool = False,  # DR16Q only; remove zestimate disagreements
+        delta_z_qso: float = 0.3,     # DR16Q only; remove zestimate disagreements
         is_qso_final_cut: bool = False,  # DR16Q only; only take final QSO samples
         class_person_cut: bool = False,  # DR16Q only; only take non-BAL samples
         z_source_cut: bool = False,  # DR16Q only; remove source_z='pipe' and z > 5
@@ -215,7 +216,7 @@ class DLACatalogue(object):
         # Note: -1 means no measurements, we should not include those values.
         self.hdu = fits.open(raw_distfile)
         if zestimate_cut:
-            delta_z_qso = 1
+            # delta_z_qso = 1
 
             # the best redshift measurement column, only in DR16Q
             z_best = self.hdu[1].data["Z"][self.test_ind]
