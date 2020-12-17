@@ -236,6 +236,59 @@ def do_qso_split(cat, subdir, z_dla_max = 5.0):
     plt.legend(loc=0)
     save_figure(path.join(subdir,"dndx_gp_zqso"+str(cat.lowzcut)))
     plt.clf()
+
+    # [DR16Q] check lowzcut + zQSO splits
+    lowzcut = cat.lowzcut
+    cat.lowzcut = True
+
+    high_z = (2.5,3.0,3.5,5.0)
+    low_z = (2.0,2.5,3.0,3.5)
+    for (high_z_qso, z_qso_split) in zip(high_z, low_z):
+        # here should actually use cat.z_qsos, since there is 3000 km/s difference z_qso and z_max
+        # [oldcond] you should select based on oldcond
+        cat.condition = oldcond * (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
+        cat.plot_omega_dla(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$" + " Cutting", zmax=z_dla_max)
+    plt.ylim(ymin=0)
+    plt.legend(loc=0)
+    save_figure(path.join(subdir,"omega_gp_zqso"+str(cat.lowzcut)))
+    plt.clf()
+
+    for (high_z_qso, z_qso_split) in zip(high_z, low_z):
+        cat.condition = oldcond * (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
+        cat.plot_line_density(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$" + " Cutting", zmax=z_dla_max)
+    plt.ylim(ymin=0,ymax=0.15)
+    plt.legend(loc=0)
+    save_figure(path.join(subdir,"dndx_gp_zqso"+str(cat.lowzcut)))
+    plt.clf()
+
+    # [DR16Q] check SNR cut + zQSO cuts
+    cat.lowzcut = False
+    old_snr = cat.snr_thresh
+    cat.set_snr(4)
+
+    high_z = (2.5,3.0,3.5,5.0)
+    low_z = (2.0,2.5,3.0,3.5)
+    for (high_z_qso, z_qso_split) in zip(high_z, low_z):
+        # here should actually use cat.z_qsos, since there is 3000 km/s difference z_qso and z_max
+        # [oldcond] you should select based on oldcond
+        cat.condition = oldcond * (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
+        cat.plot_omega_dla(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$" + " SNR > 4", zmax=z_dla_max)
+    plt.ylim(ymin=0)
+    plt.legend(loc=0)
+    save_figure(path.join(subdir,"omega_gp_zqso_snr"))
+    plt.clf()
+
+    for (high_z_qso, z_qso_split) in zip(high_z, low_z):
+        cat.condition = oldcond * (cat.z_max() < high_z_qso)*(cat.z_max() > z_qso_split)
+        cat.plot_line_density(label="$"+str(high_z_qso)+" > z_\mathrm{QSO} > "+str(z_qso_split)+"$" + " SNR > 4", zmax=z_dla_max)
+    plt.ylim(ymin=0,ymax=0.15)
+    plt.legend(loc=0)
+    save_figure(path.join(subdir,"dndx_gp_zqso_snr"))
+    plt.clf()
+
+    # assign the old conditions
+    cat.snr_thresh = old_snr
+    cat.lowzcut = lowzcut
     cat.condition = oldcond
 
 def do_length_split(cat, subdir, z_dla_max = 5):
