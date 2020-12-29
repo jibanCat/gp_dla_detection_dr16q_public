@@ -88,6 +88,7 @@ class DLACatalogue(object):
         catalog_file: str = "catalog.mat",
         snr: int = -2,
         lowzcut: bool = False,
+        highzcut: bool = False,
         second: Union[int, bool] = False,
         sub_dla: bool = True,
         occams_razor: int = 10000,
@@ -129,6 +130,10 @@ class DLACatalogue(object):
         # Exclude spectra closer to the DLA than this, which has fewer DLAs than average.
         self.lowzcut = lowzcut
         self.proximity_zone = 0.1
+        # Exclude spectra closer to the tail of the spectrum, which has more dubious DLAs than average.
+        self.highzcut = highzcut
+        self.tail_zone = 0.1
+
         self.raw_file = raw_file
         self.processed_file = processed_file
         self.catalog_file = catalog_file
@@ -832,6 +837,11 @@ class DLACatalogue(object):
                 [np.min([max_z_dlas, self.proximity(max_z_dlas)], axis=0), min_z_dlas],
                 axis=0,
             )
+        if self.highzcut:
+            min_z_dlas = np.min(
+                [np.max([min_z_dlas, self.tail(min_z_dlas)], axis=0), max_z_dlas],
+                axis=0,
+            )
         assert np.all(max_z_dlas - min_z_dlas >= 0)
         # Filter spectra that aren't in our redshift range
         i2 = np.where(np.logical_and(min_z_dlas < z_max, max_z_dlas > z_min))
@@ -1393,6 +1403,11 @@ class DLACatalogue(object):
         """Remove a redshift range close to the quasar"""
         dz = self.proximity_zone
         return zqso - dz
+    
+    def tail(self, zmin):
+        """Remove a redshift range close to the tail of the spectrum"""
+        dz = self.tail_zone
+        return zmin + dz
 
     def _split_distributions_single(
         self,
@@ -1435,6 +1450,8 @@ class DLACatalogue(object):
             upper_z = ured
             if self.lowzcut:
                 upper_z = np.min([self.proximity(self.z_max(spec)), ured])
+            if self.highzcut:
+                lred = np.max([self.tail(self.z_min(spec)), lred])
             # Select only samples with a DLA value, within the redshift we want.
             desired_samples = (
                 (lnhi_vals > lnhi_min)
