@@ -1448,16 +1448,17 @@ class DLACatalogue(object):
             (lnhi_vals, redshifts) = self._get_sample_params(spec, second=second)
             # The low cutoff redshift.
             upper_z = ured
+            lower_z = lred
             if self.lowzcut:
                 upper_z = np.min([self.proximity(self.z_max(spec)), ured])
             if self.highzcut:
-                lred = np.max([self.tail(self.z_min(spec)), lred])
+                lower_z = np.max([self.tail(self.z_min(spec)), lred])
             # Select only samples with a DLA value, within the redshift we want.
             desired_samples = (
                 (lnhi_vals > lnhi_min)
                 * (lnhi_vals < lnhi_max)
                 * (redshifts < upper_z)
-                * (redshifts > lred)
+                * (redshifts > lower_z)
             )
             if self.filter_noisy_pixels:
                 # Exclude pixels which have too large noise within them
