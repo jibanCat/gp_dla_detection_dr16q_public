@@ -376,6 +376,31 @@ def do_omega_dla_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str 
     save_figure(os.path.join(subdir,"omega_occams"))
     plt.clf()
 
+def do_omega_dla_XQ100(subdir: str = "CDDF_analysis"):
+    """
+    Make OmegaDLA plots with systematics from Occams razors.
+    """
+    dla_data.omegahi_not()
+    dla_data.omegahi_pro()
+    dla_data.crighton_omega()
+    dla_data.xq100_omega()
+
+    # (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) in (6, N) shape
+    omega_dla_all = np.loadtxt(os.path.join(subdir, "omega_dla_all.txt"))
+    (_, N) = omega_dla_all.shape
+
+    omega_dla_68 = np.full((N, 2), fill_value=np.nan)
+    omega_dla_95 = np.full((N, 2), fill_value=np.nan)
+    (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) = omega_dla_all
+
+    plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C0")
+
+    plt.legend(loc=0)
+    plt.xlim(2,5)
+    plt.ylim(0,2.5)
+    plt.tight_layout()
+    save_figure(os.path.join(subdir,"omega_xq100"))
+    plt.clf()
 
 def plot_omega_dla(z_cent: np.ndarray, omega_dla: np.ndarray, omega_dla_68: np.ndarray, omega_dla_95: np.ndarray, zmin: float = 2., zmax: float = 5., label: str = "GP", color: str = "blue", twosigma: bool = True, bins_per_z: int = 6):
     """Plot omega_DLA as a function of redshift, with full Bayesian errors"""
