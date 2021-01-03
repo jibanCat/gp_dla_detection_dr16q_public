@@ -912,7 +912,31 @@ class QSOLoader(object):
 
         return Delta_z_dlas, Delta_log_nhis
 
-    def make_MAP_parks_comparison(self, catalog, num_dlas=1, dla_confidence=0.98):
+    def make_MAP_hist2d(self, p_thresh = 0.98):
+        '''
+        Make a 2D hist for z_map vs z_true
+        p_thresh (float) : p_dlas < p_thresh are not considered to be DLAs
+        '''
+        real_index = self.dla_catalog.real_index # concordance only
+
+        # get corresponding map vals for concordance only
+        # and threshold the p_dlas
+        this_dla_map_model_index = self.dla_map_model_index.copy()
+        this_dla_map_model_index[self.p_dlas < p_thresh] = 0
+        map_model_index  = this_dla_map_model_index[real_index]
+
+        # make sure having at least one DLA, concordance ∩ garnett
+        real_index = real_index[map_model_index > self.sub_dla]
+
+        map_z_dlas   = self.map_z_dlas[real_index, 0, 0]   # assume DLA(1) corresponds to the concordance value
+        map_log_nhis = self.map_log_nhis[real_index, 0, 0]
+        
+        true_z_dlas   = self.dla_catalog.z_dlas[map_model_index > self.sub_dla]
+        true_log_nhis = self.dla_catalog.log_nhis[map_model_index > self.sub_dla]
+
+        return map_z_dlas, true_z_dlas, map_log_nhis, true_log_nhis, real_index
+
+    def make_MAP_parks_comparison(self, catalog, num_dlas=1, dla_confidence=0.98, return_map_values: bool = False):
         '''
         make a comparison between map values and Park's predictions
 
@@ -968,6 +992,12 @@ class QSOLoader(object):
         # looping over each ID and comparing the MAP values between Parks and Garnett
         Delta_z_dlas   = np.empty((len(uids_dla_n), num_dlas))
         Delta_log_nhis = np.empty((len(uids_dla_n), num_dlas))
+
+        gp_z_dlas = np.empty((len(uids_dla_n), num_dlas))
+        gp_log_nhis = np.empty((len(uids_dla_n), num_dlas))
+        cnn_z_dlas = np.empty((len(uids_dla_n), num_dlas))
+        cnn_log_nhis = np.empty((len(uids_dla_n), num_dlas))
+
         # TODO: to see if there is any way to avoiding using for loop, though it seems to be fine 
         # for multi-DLAs since they are rare events.
         for i,uid in enumerate(uids_dla_n):
@@ -993,6 +1023,14 @@ class QSOLoader(object):
 
             Delta_z_dlas[i, :]   = (this_z_dlas[argsort_garnett]   - this_z_dlas_parks[argsort_parks])
             Delta_log_nhis[i, :] = (this_log_nhis[argsort_garnett] - this_log_nhis_parks[argsort_parks])
+
+            gp_z_dlas[i, :] = this_z_dlas[argsort_garnett]
+            gp_log_nhis[i, :] = this_log_nhis[argsort_garnett]
+            cnn_z_dlas[i, :] = this_z_dlas_parks[argsort_parks]
+            cnn_log_nhis[i, :] = this_log_nhis_parks[argsort_parks]
+
+        if return_map_values:
+            return Delta_z_dlas, Delta_log_nhis, z_dlas_parks, gp_z_dlas, gp_log_nhis, cnn_z_dlas, cnn_log_nhis
 
         return Delta_z_dlas, Delta_log_nhis, z_dlas_parks
 
@@ -1054,7 +1092,7 @@ class QSOLoader(object):
         catalog (collections.namedtuple) : assume to be Parks' catalog, but 
             could be extend to other catalogs
         snr : only compare spectra with signal-to-noise > snr
-        lyb : only compare DLAs with z_DLA > z_QSO  
+        lyb : only compare DLAs with z_DLA > lyb emission line  
 
         What we want is to compute a confusion matrix for multi-DLAs such as:
         
