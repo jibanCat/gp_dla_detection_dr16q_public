@@ -4,6 +4,8 @@ QSOLoader for DR16Q GP catalogue
 
 from typing import Dict, List, Tuple
 
+from collections import namedtuple, Counter
+
 import numpy as np
 from matplotlib import pyplot as plt
 import h5py
@@ -305,10 +307,6 @@ class QSOLoaderDR16Q(QSOLoader):
         self.z_condition = z_condition
         self.condition = self.condition * z_condition
 
-
-    def load_dla_parks(self, p_thresh: float = 0.97):
-        NotImplementedError
-
     @staticmethod
     def prediction_parks2dict(dist_file: str, selected_thing_ids = None) -> Dict:
         """
@@ -580,3 +578,125 @@ class QSOLoaderDR16Q(QSOLoader):
         map_log_nhis : MAP log NHI values
         '''
         NotImplementedError
+
+    def load_dla_parks(self, dla_parks: str = "DR16Q_v4.fits", p_thresh: float = 0.98, release: str = 'dr12', multi_dla: bool = True, num_dla: int = 2):
+        '''
+        load Parks CNN predictions out of DR16Q catalogue
+
+        Note: we have to consider DLAs from the same sightlines as different objects
+
+        Parameters:
+        ----
+        dla_parks (str) : the filename of DR16Q catalogue
+        p_thresh (float): the minimum probability to be considered as a DLA in Parks CNN
+        release (str) 
+        multi_dla (bool): whether or not we want to construct multi-dla index
+        num_dla (int)   : number of dla we want to consider if we are considering multi-dlas
+        
+        Note:
+        ---
+        We only load those spectra in our GP catalogue
+        '''
+        dict_parks = self.prediction_parks2dict(dla_parks, selected_thing_ids=self.thing_ids)
+
+        # construct an array of unique ids for los
+        # Note: keep spectral ID here to avoid thing_id to be -1
+        self.unique_ids = self.make_unique_id(self.plates, self.mjds, self.fiber_ids)
+        unique_ids      = self.make_unique_id( dict_parks['plates'], dict_parks['mjds'], dict_parks['fiber_ids'])  
+        assert unique_ids.dtype is np.dtype('int64')
+        assert self.unique_ids.dtype is np.dtype('int64')
+
+        # TODO: make the naming of variables more consistent
+        raw_unique_ids      = unique_ids
+        raw_thing_ids       = dict_parks['thing_ids']
+        raw_z_dlas          = dict_parks['z_dlas']
+        raw_log_nhis        = dict_parks['log_nhis']
+        raw_dla_confidences = dict_parks['dla_confidences']
+
+        real_index_los = np.where( np.in1d(self.unique_ids, unique_ids) )[0]
+        
+        unique_ids_los = self.unique_ids[real_index_los]
+        thing_ids_los  = self.thing_ids[real_index_los]
+        assert np.unique(unique_ids_los).shape[0] == unique_ids_los.shape[0] # make sure we don't double count los
+
+        # construct an array of unique ids for dlas
+        dla_inds = dict_parks['dla_confidences'] > p_thresh
+
+        real_index_dla = np.where( np.in1d(self.unique_ids, unique_ids[dla_inds]) )[0] # Note that in this step we lose
+                                                                              # the info about multi-DLA since 
+                                                                              # we are counting based on los
+
+        unique_ids_dla = self.unique_ids[real_index_dla]
+        thing_ids_dla  = self.thing_ids[real_index_dla]
+
+        # Construct a list of sub-los index and dla detection based on sub-los.
+        # This is a relatively complicate loop and it's hard to understand philosophically.
+        # It's better to write an explaination in the paper.
+        if multi_dla:
+            self.multi_unique_ids = self.make_multi_unique_id(num_dla, self.plates, self.mjds, self.fiber_ids) 
+            multi_unique_ids      = self.make_multi_unique_id(
+                num_dla, dict_parks['plates'], dict_parks['mjds'], dict_parks['fiber_ids'])  # note here some index repeated 
+                                                                                             # more than num_dla times
+
+            multi_real_index_los = np.where( np.in1d(self.multi_unique_ids, multi_unique_ids) )[0] # here we have a real_index array
+                                                                                                 # exactly repeat num_dla times
+
+            multi_unique_ids_los = self.multi_unique_ids[multi_real_index_los]
+
+            self.multi_thing_ids = self.make_array_multi(num_dla, self.thing_ids)
+            multi_thing_ids_los  = self.multi_thing_ids[multi_real_index_los]
+
+            # loop over unique_ids to assign DLA detection to sub-los
+            # Note: here we ignore the z_dla of DLAs.
+            dla_multi_inds = np.zeros(multi_unique_ids_los.shape, dtype=bool)
+            for uid in np.unique(multi_unique_ids_los):
+                k_dlas = ( dict_parks['dla_confidences'][unique_ids == uid] > p_thresh ).sum()
+
+                k_dlas_val = np.zeros(num_dla, dtype=bool)
+                k_dlas_val[:k_dlas] = True                 # assigning True until DLA(k)
+
+                # assign DLA detections to the unique_ids of sub-los
+                dla_multi_inds[ multi_unique_ids_los == uid ] = k_dlas_val
+                assert multi_unique_ids_los[ multi_unique_ids_los == uid ].shape[0] == num_dla
+                
+            multi_real_index_dla = multi_real_index_los[dla_multi_inds]
+            multi_unique_ids_dla = multi_unique_ids_los[dla_multi_inds]
+            multi_thing_ids_dla  = multi_thing_ids_los[dla_multi_inds]
+
+            # store data in named tuple under self
+            dla_catalog = namedtuple(
+                'dla_catalog_parks', 
+                ['real_index', 'real_index_los', 
+                'thing_ids', 'thing_ids_los',
+                'unique_ids', 'unique_ids_los',
+                'multi_real_index_dla', 'multi_real_index_los',
+                'multi_thing_ids_dla', 'multi_thing_ids_los',
+                'multi_unique_ids_dla', 'multi_unique_ids_los', 
+                'release', 'num_dla', 
+                'raw_unique_ids', 'raw_z_dlas', 'raw_log_nhis', 'raw_dla_confidences' ])
+            self.dla_catalog_parks = dla_catalog(
+                real_index=real_index_dla, real_index_los=real_index_los, 
+                thing_ids=thing_ids_dla, thing_ids_los=thing_ids_los, 
+                unique_ids=unique_ids_dla, unique_ids_los=unique_ids_los,
+                multi_real_index_dla=multi_real_index_dla, multi_real_index_los=multi_real_index_los,
+                multi_thing_ids_dla=multi_thing_ids_dla, multi_thing_ids_los=multi_thing_ids_los,
+                multi_unique_ids_dla=multi_unique_ids_dla, multi_unique_ids_los=multi_unique_ids_los,
+                release=release, num_dla=num_dla,
+                raw_unique_ids=raw_unique_ids, raw_z_dlas=raw_z_dlas, 
+                raw_log_nhis=raw_log_nhis, raw_dla_confidences=raw_dla_confidences)
+
+        else:
+            dla_catalog = namedtuple(
+                'dla_catalog_parks', 
+                ['real_index', 'real_index_los', 
+                'thing_ids', 'thing_ids_los',
+                'unique_ids', 'unique_ids_los',
+                'release',
+                'raw_unique_ids', 'raw_z_dlas', 'raw_log_nhis', 'raw_dla_confidences' ])
+            self.dla_catalog_parks = dla_catalog(
+                real_index=real_index_dla, real_index_los=real_index_los, 
+                thing_ids=thing_ids_dla, thing_ids_los=thing_ids_los, 
+                unique_ids=unique_ids_dla, unique_ids_los=unique_ids_los,
+                release=release,
+                raw_unique_ids=raw_unique_ids, raw_z_dlas=raw_z_dlas, 
+                raw_log_nhis=raw_log_nhis, raw_dla_confidences=raw_dla_confidences)
