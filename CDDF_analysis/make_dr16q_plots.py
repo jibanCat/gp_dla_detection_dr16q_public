@@ -539,3 +539,97 @@ def do_Parks_snr_check(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfi
     plt.ylim(0, 0.16)
     save_figure(os.path.join(subdir, "dndx_parks_snr"))
     plt.clf()
+
+def do_confusion_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", snr: float = -1.0, dla_confidence: float = 0.98, p_thresh: float = 0.98, lyb: bool = True):
+    '''
+    plot the multi-DLA confusion matrix between our MAP predictions and Parks' predictions 
+    '''
+    if 'dla_catalog_parks' not in dir(qsos):
+        qsos.load_dla_parks(dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1)
+
+    confusion_matrix,_ = qsos.make_multi_confusion(qsos.dla_catalog_parks, dla_confidence, p_thresh, snr=snr, lyb=lyb)
+
+    size, _ = confusion_matrix.shape
+
+    print("Confusion Matrix Garnett's Multi-DLA versus Parks : ")
+    print("----")
+    for i in range(size):
+        print("{} DLA".format(i), end="\t")
+        for j in range(size):
+            print("{}".format(confusion_matrix[i,j]), end=" ")   
+        print("")
+
+    print("Mutli-DLA disagreements : ")
+    print("----")
+    for i in range(size):
+        num = confusion_matrix[(i+1):, 0:(i+1)].sum() + confusion_matrix[0:(i+1), (i+1):].sum()
+        print("Error between >= {} DLAs and < {} DLAs: {:.2g}".format(i + 1, i + 1, num / confusion_matrix.sum()))
+
+def do_MAP_parks_comparison(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", dla_confidence: float = 0.98, num_dlas: int = 1, num_bins: int = 100):
+    '''
+    Plot the comparisons between MAP values and Parks' predictions
+    '''
+    if 'dla_catalog_parks' not in dir(qsos):
+        qsos.load_dla_parks(dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1)
+
+    Delta_z_dlas, Delta_log_nhis, z_dlas_parks = qsos.make_MAP_parks_comparison(
+        qsos.dla_catalog_parks, num_dlas=num_dlas, dla_confidence=dla_confidence)
+
+    fig, axs = plt.subplots(1, 2, figsize=(16, 5))
+    # plot in the same scale as in the Garnett (2017) paper
+    # for z_dlas, xlim(-0.01, 0.01); for log_nhis, xlim(-1, 1)
+    # TODO: make KDE plot
+    axs[0].hist(Delta_z_dlas.ravel(), 
+        bins=np.linspace(-0.01, 0.01, num_bins), density=True)
+    axs[0].set_xlim(-0.01, 0.01)
+    axs[0].set_xlabel(r'difference between $z_{DLA}$ (new code/Parks);'+' DLA({})'.format(num_dlas))
+    axs[0].set_ylabel(r'$p$(difference)')
+
+    axs[1].hist(Delta_log_nhis.ravel(), 
+        bins=np.linspace(-1, 1, num_bins), density=True)
+    axs[1].set_xlim(-1, 1)
+    axs[1].set_xlabel(r'difference between $\log{N_{HI}}$ (new code/Parks);'+' DLA({})'.format(num_dlas))
+    axs[1].set_ylabel(r'$p$(difference)')
+
+    plt.tight_layout()
+    save_figure('MAP_comparison_Parks_dlas{}_confidence{}'.format(num_dlas, str(dla_confidence).replace(".","_")))
+    plt.clf()
+    plt.close()   
+
+    high_z = np.array([2.5,3.0,3.5,5.0])
+    low_z = np.array([2.0,2.5,3.0,3.5])
+    log_nhi_evo = []; sterr_log_nhi_evo = []
+    z_dla_evo   = []; sterr_z_dla_evo   =  []
+    for high_z_dla, low_z_dla in zip(high_z, low_z):
+        inds = (z_dlas_parks > low_z_dla) & (z_dlas_parks < high_z_dla)
+
+        z_dla_evo.append( np.nanmean( Delta_z_dlas[inds] ) )
+        log_nhi_evo.append( np.nanmean( Delta_log_nhis[inds] ) )
+
+        # stderr = sqrt(s / n)
+        sterr_z_dla_evo.append( 
+            np.sqrt( np.nansum((Delta_z_dlas[inds] - np.nanmean(Delta_z_dlas[inds]))**2 ) / (Delta_z_dlas[inds].shape[0] - 1)) 
+            / np.sqrt(Delta_z_dlas[inds].shape[0]) )
+
+        sterr_log_nhi_evo.append( 
+            np.sqrt( np.nansum( (Delta_log_nhis[inds] - np.nanmean(Delta_log_nhis[inds]))**2 ) / (Delta_log_nhis[inds].shape[0] - 1)) 
+            / np.sqrt(Delta_log_nhis[inds].shape[0]) )
+
+    z_cent = np.array( [(z_x + z_m) / 2. for (z_m, z_x) in zip(high_z, low_z)] )
+    xerrs  = (z_cent - low_z, high_z - z_cent)
+
+    plt.errorbar(z_cent, z_dla_evo, yerr=sterr_z_dla_evo, xerr=xerrs, 
+        label=r"$z_{{DLA}} - z_{{DLA}}^{{Parks}} \mid \mathrm{{Garnett}}({k}) \cap \mathrm{{Parks}}({k})$".format(k=num_dlas))
+    plt.xlabel(r"$z_{DLA}^{Parks}$")
+    plt.ylabel(r"$\Delta z_{DLA}$")
+    plt.legend(loc=0)
+    save_figure("MAP_z_dla_evolution_parks")
+    plt.clf()
+
+    plt.errorbar(z_cent, log_nhi_evo, yerr=sterr_log_nhi_evo, xerr=xerrs, 
+        label=r"$\log{{N_{{HI}}}}_{{DLA}} - \log{{N_{{HI}}}}_{{DLA}}^{{Parks}} \mid \mathrm{{Garnett}}({k}) \cap \mathrm{{Parks}}({k})$".format(k=num_dlas))
+    plt.xlabel(r"$z_{DLA}^{Parks}$")
+    plt.ylabel(r"$\Delta \log{N_{HI}}$")
+    plt.legend(loc=0)
+    save_figure("MAP_log_nhi_evolution_parks")
+    plt.clf()
