@@ -2,9 +2,13 @@
 QSOLoader for DR16Q GP catalogue
 """
 
+from typing import Dict, List, Tuple
+
 import numpy as np
 from matplotlib import pyplot as plt
 import h5py
+
+from astropy.io import fits
 
 from .set_parameters import *
 from .qso_loader import QSOLoader, GPLoader
@@ -51,6 +55,7 @@ class QSOLoaderDR16Q(QSOLoader):
         self.beta_samples = self.tau_sample_file["beta_samples"][:, 0]        
 
         # read the DR16Q catalogue file
+        self.dist_file = dist_file
         self.hdu = fits.open(dist_file)
 
         # filter: from DR16Q catalog -> our QSO samples
@@ -304,16 +309,112 @@ class QSOLoaderDR16Q(QSOLoader):
     def load_dla_parks(self, p_thresh: float = 0.97):
         NotImplementedError
 
-    def _get_parks_estimations(self, p_thresh: float = 0.97):
+    @staticmethod
+    def prediction_parks2dict(dist_file: str, selected_thing_ids = None) -> Dict:
+        """
+        Get Parks' CNN predictions on DR16Q catalogue
+
+        Split a single spectrum to several DLAs.
+
+        No DLA for NaN in dla_confidence
+
+        Z_PCA for zQSO.
+        """
+        hdu = fits.open(dist_file)
+
+        # extract DLA information (exclude subDLA, lyb)
+        ras       = []
+        decs      = []
+        plates    = []
+        mjds      = []
+        fiber_ids = []
+        z_qsos    = []
+        dla_confidences = []
+        z_dlas    = []
+        log_nhis  = []
+        thing_ids = []
+
+        num_quasars = hdu[1].data["THING_ID"].shape[0]
+
+        for i in range(num_quasars):
+            # find number DLAs
+            conf_dla = hdu[1].data["CONF_DLA"][i, :]
+            num_dlas = np.sum(conf_dla != -1)
+
+            assert num_dlas >= 0
+            assert num_dlas <= 5
+
+            # [thing_id] check if the thing_id is in the selected
+            thing_id = hdu[1].data["THING_ID"][i]
+            if thing_id not in selected_thing_ids:
+                continue
+
+            # has dla(s)
+            if num_dlas > 0:
+                for j in range(num_dlas):
+                    # append basic quasar info
+                    thing_ids.append(hdu[1].data["THING_ID"][i])
+                    ras.append(hdu[1].data["RA"][i])
+                    decs.append(hdu[1].data["DEC"][i])
+                    plates.append(hdu[1].data["PLATE"][i])
+                    mjds.append(hdu[1].data["MJD"][i])
+                    fiber_ids.append(hdu[1].data["FIBERID"][i])
+                    z_qsos.append(hdu[1].data["Z_PCA"][i])
+
+                    # append the object (dla or lyb or subdla) info
+                    dla_confidences.append(hdu[1].data["CONF_DLA"][i, j])
+                    z_dlas.append(hdu[1].data["Z_DLA"][i, j])
+                    log_nhis.append(hdu[1].data["NHI_DLA"][i, j])
+
+                    assert dla_confidences[-1] >= 0
+                    assert dla_confidences[-1] <= 1
+                    assert log_nhis[-1] >= 20.3
+                    assert z_qsos[-1] >= 0
+
+            elif num_dlas == 0:
+                # append basic quasar info
+                thing_ids.append(hdu[1].data["THING_ID"][i])
+                ras.append(hdu[1].data["RA"][i])
+                decs.append(hdu[1].data["DEC"][i])
+                plates.append(hdu[1].data["PLATE"][i])
+                mjds.append(hdu[1].data["MJD"][i])
+                fiber_ids.append(hdu[1].data["FIBERID"][i])
+                z_qsos.append(hdu[1].data["Z_PCA"][i])
+                
+                # append the object (dla or lyb or subdla) info
+                dla_confidences.append(np.nan)
+                z_dlas.append(np.nan)
+                log_nhis.append(np.nan)
+
+        dict_parks = {
+                'thing_ids' :       np.array(thing_ids).astype(np.int),
+                'ras'    :          np.array(ras),
+                'decs'   :          np.array(decs),
+                'plates' :          np.array(plates).astype(np.int),
+                'mjds'   :          np.array(mjds).astype(np.int),
+                'fiber_ids' :       np.array(fiber_ids).astype(np.int),
+                'z_qso'  :          np.array(z_qsos),
+                'dla_confidences' : np.array(dla_confidences),
+                'z_dlas' :          np.array(z_dlas),
+                'log_nhis' :        np.array(log_nhis)
+            }
+
+        return dict_parks
+
+
+    def _get_parks_estimations(self, dla_parks: str = "DR16Q_v4.fits", p_thresh: float = 0.97, lyb: bool = False, prior: bool = False, search_range_from_ours: bool = False) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         '''
         Get z_dlas and log_nhis from Parks' (2018) estimations
         '''
+        # make sure we are reading the DR16Q file
+        assert dla_parks in self.dist_file
+
         if 'dict_parks' not in dir(self):
-            self.dict_parks = self.prediction_json2dict(dla_parks)
+            self.dict_parks = self.prediction_parks2dict(self.dist_file, selected_thing_ids=self.thing_ids)
 
         if 'p_thresh' in self.dict_parks.keys():
             if self.dict_parks['p_thresh'] == p_thresh:
-                unique_ids  = self.dict_parks['unique_ids']
+                thing_ids  = self.dict_parks['cddf_thing_ids']
                 log_nhis    = self.dict_parks['cddf_log_nhis']  
                 z_dlas      = self.dict_parks['cddf_z_dlas']    
                 min_z_dlas  = self.dict_parks['min_z_dlas']
@@ -323,75 +424,80 @@ class QSOLoaderDR16Q(QSOLoader):
                 p_dlas      = self.dict_parks['cddf_p_dlas']    
                 p_thresh    = self.dict_parks['p_thresh']  
 
-                return unique_ids, log_nhis, z_dlas, min_z_dlas, max_z_dlas, snrs, all_snrs, p_dlas
+                return thing_ids, log_nhis, z_dlas, min_z_dlas, max_z_dlas, snrs, all_snrs, p_dlas
 
         dict_parks = self.dict_parks
 
-        # construct an array of unique ids for los
-        self.unique_ids = self.make_unique_id(self.plates, self.mjds, self.fiber_ids)
-        unique_ids      = self.make_unique_id( dict_parks['plates'], dict_parks['mjds'], dict_parks['fiber_ids'] ) 
-        assert unique_ids.dtype is np.dtype('int64')
-        assert self.unique_ids.dtype is np.dtype('int64')
+        # use thing_ids as an identifier
+        # use zPCA as zQSOs, as said in DR16Q paper
+        thing_ids = dict_parks["thing_ids"]
+        z_qsos = dict_parks["z_qso"]
 
         # fixed range of the sightline ranging from 911A-1215A in rest-frame
         # we should include all sightlines in the dataset        
-        roman_inds = np.isin(unique_ids, self.unique_ids)
 
-        z_qsos     = dict_parks['z_qso'][roman_inds]
-        uids       = unique_ids[roman_inds]
-        
-        uids, indices = np.unique( uids, return_index=True )
+        assert np.all(np.isin(thing_ids, self.thing_ids))        
 
         # for loop to get snrs from sbird's snrs file
-        all_snrs           = np.zeros( uids.shape )
+        all_snrs = np.zeros( thing_ids.shape )
 
-        for i,uid in enumerate(uids):
-            real_index = np.where( self.unique_ids == uid )[0][0]
+        for i,thing_id in enumerate(thing_ids):
+            real_index  = np.where( self.thing_ids == thing_id )[0][0]
+            all_snrs[i] = self.snrs[real_index]
 
-            all_snrs[i]           = self.snrs[real_index]
-
-        z_qsos     = z_qsos[indices]
-
-        min_z_dlas = (1 + z_qsos) *  lyman_limit  / lya_wavelength - 1
+        # the searching range for the DLAs.
+        if lyb:
+            print("Searching min_z_dla: lyb ... ")
+            min_z_dlas = (1 + z_qsos) *  lyb_wavelength  / lya_wavelength - 1
+        else:
+            min_z_dlas = (1 + z_qsos) *  lyman_limit  / lya_wavelength - 1
+        print("Searching max_z_dla: lya ... ")
         max_z_dlas = (1 + z_qsos) *  lya_wavelength  / lya_wavelength - 1
+
+        # get search range from the processed file
+        # redo the full searching range
+        if search_range_from_ours:
+            print("Using our own searching range")
+            min_z_dlas = np.zeros( thing_ids.shape )
+            max_z_dlas = np.zeros( thing_ids.shape )
+
+            for i,thing_id in enumerate(thing_ids):
+                real_index = np.where( self.thing_ids == thing_id )[0][0]
+
+                min_z_dlas[i] = self.min_z_dlas[real_index]
+                max_z_dlas[i] = self.max_z_dlas[real_index]
 
         # get DLA properties
         # note: the following indices are DLA-only
         dla_inds = dict_parks['dla_confidences'] > 0.005 # use p_thresh=0.005 to filter out non-DLA spectra and 
                                                          # speed up the computation
 
-        unique_ids = unique_ids[dla_inds]
+        thing_ids = thing_ids[dla_inds]
         log_nhis   = dict_parks['log_nhis'][dla_inds]
         z_dlas     = dict_parks['z_dlas'][dla_inds]
         z_qsos     = dict_parks['z_qso'][dla_inds]
         p_dlas     = dict_parks['dla_confidences'][dla_inds]
 
-        # check if all ids are in Roman's sample
-        roman_inds = np.isin(unique_ids, self.unique_ids)
-        unique_ids = unique_ids[roman_inds]
-        log_nhis   = log_nhis[roman_inds]
-        z_dlas     = z_dlas[roman_inds]
-        z_qsos     = z_qsos[roman_inds]
-        p_dlas     = p_dlas[roman_inds]
-
         # for loop to get snrs from sbird's snrs file
-        snrs           = np.zeros( unique_ids.shape )
-        log_priors_dla = np.zeros( unique_ids.shape )
+        # Note arrays here are for DLA only
+        snrs           = np.zeros( thing_ids.shape )
+        log_priors_dla = np.zeros( thing_ids.shape )
 
-        for i,uid in enumerate(unique_ids):
-            real_index = np.where( self.unique_ids == uid )[0][0]
+        for i,thing_id in enumerate(thing_ids):
+            real_index = np.where( self.thing_ids == thing_id )[0][0]
 
             snrs[i]           = self.snrs[real_index]
             log_priors_dla[i] = self.log_priors_dla[real_index]
 
         # re-calculate dla_confidence based on prior of DLAs given z_qsos
         if prior:
+            print("Applying our DLA prior ...")
             p_dlas = p_dlas * np.exp(log_priors_dla)
             p_dlas = p_dlas / np.max(p_dlas)
 
         dla_inds = p_dlas > p_thresh
 
-        unique_ids     = unique_ids[dla_inds]
+        thing_ids      = thing_ids[dla_inds]
         log_nhis       = log_nhis[dla_inds]
         z_dlas         = z_dlas[dla_inds]
         z_qsos         = z_qsos[dla_inds]
@@ -400,12 +506,38 @@ class QSOLoaderDR16Q(QSOLoader):
         log_priors_dla = log_priors_dla[dla_inds]
 
         # get rid of z_dlas larger than z_qsos or lower than lyman limit
-        z_cut_inds = (
-            z_dlas > ((1 + z_qsos) *  lyman_limit  / lya_wavelength - 1) ) 
+        if lyb:
+            z_cut_inds = (
+                z_dlas > ((1 + z_qsos) *  lyb_wavelength  / lya_wavelength - 1) ) 
+        else:
+            z_cut_inds = (
+                z_dlas > ((1 + z_qsos) *  lyman_limit  / lya_wavelength - 1) ) 
+        
         z_cut_inds = np.logical_and(
             z_cut_inds, (z_dlas < ( (1 + z_qsos) *  lya_wavelength  / lya_wavelength - 1 )) )
 
-        unique_ids     = unique_ids[z_cut_inds]
+        if search_range_from_ours:
+            # we are not sure if the search range is lyb in the processed file
+            assert lyb is False
+
+            # for loop to get min z_dlas and max z_dlas search range from processed data
+            _min_z_dlas = np.zeros( thing_ids.shape )
+            _max_z_dlas = np.zeros( thing_ids.shape )
+
+            for i,thing_id in enumerate(thing_ids):
+                real_index = np.where( self.thing_ids == thing_id )[0][0]
+
+                _min_z_dlas[i] = self.min_z_dlas[real_index]
+                _max_z_dlas[i] = self.max_z_dlas[real_index]
+
+            # # Parks chap 3.2: fixed range of the sightline ranging from 900A-1346A in rest-frame
+            # min_z_dlas = (1 + z_qsos) *  900   / lya_wavelength - 1
+            # max_z_dlas = (1 + z_qsos) *  1346  / lya_wavelength - 1
+
+            z_cut_inds = ( z_dlas >= _min_z_dlas  )
+            z_cut_inds = np.logical_and(z_cut_inds, (z_dlas <= _max_z_dlas) )
+
+        thing_ids      = thing_ids[z_cut_inds]
         log_nhis       = log_nhis[z_cut_inds]
         z_dlas         = z_dlas[z_cut_inds]
         z_qsos         = z_qsos[z_cut_inds]
@@ -413,23 +545,7 @@ class QSOLoaderDR16Q(QSOLoader):
         snrs           = snrs[z_cut_inds]
         log_priors_dla = log_priors_dla[z_cut_inds]
 
-        # # for loop to get min z_dlas and max z_dlas search range from processed data
-        # min_z_dlas = np.zeros( unique_ids.shape )
-        # max_z_dlas = np.zeros( unique_ids.shape )
-
-        # for i,uid in enumerate(unique_ids):
-        #     real_index = np.where( self.unique_ids == uid )[0][0]
-
-        #     min_z_dlas[i] = self.min_z_dlas[real_index]
-        #     max_z_dlas[i] = self.max_z_dlas[real_index]
-
-        # # Parks chap 3.2: fixed range of the sightline ranging from 900A-1346A in rest-frame
-        # min_z_dlas = (1 + z_qsos) *  900   / lya_wavelength - 1
-        # max_z_dlas = (1 + z_qsos) *  1346  / lya_wavelength - 1
-
-        # assert np.all( ( z_dlas < max_z_dlas[0] ) & (z_dlas > min_z_dlas[0]) )
-
-        self.dict_parks['unique_ids']    = unique_ids
+        self.dict_parks['cddf_thing_ids'] = thing_ids
         self.dict_parks['cddf_log_nhis'] = log_nhis
         self.dict_parks['cddf_z_dlas']   = z_dlas
         self.dict_parks['min_z_dlas']    = min_z_dlas 
@@ -439,7 +555,7 @@ class QSOLoaderDR16Q(QSOLoader):
         self.dict_parks['cddf_p_dlas']   = p_dlas
         self.dict_parks['p_thresh']      = p_thresh
 
-        return unique_ids, log_nhis, z_dlas, min_z_dlas, max_z_dlas, snrs, all_snrs, p_dlas
+        return thing_ids, log_nhis, z_dlas, min_z_dlas, max_z_dlas, snrs, all_snrs, p_dlas
 
 
     def plot_this_mu(self, nspec, suppressed=True, num_voigt_lines=3, num_forest_lines=31, Parks=False, dla_parks=None, 

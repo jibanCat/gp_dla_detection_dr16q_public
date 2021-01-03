@@ -304,6 +304,7 @@ class QSOLoader(object):
         # remove all NaN slices from our sample
         nan_inds = np.isnan( self.p_dlas )
 
+        # [filter] this line applied NaN to the test_ind
         self.test_ind[self.test_ind == True] = ~nan_inds
 
         self.test_real_index  = self.test_real_index[~nan_inds]
@@ -365,7 +366,7 @@ class QSOLoader(object):
         multi_highest_posterior = (self.multi_p_dlas * np.ones( (num_models, num_qsos), dtype=np.int8 ))
         multi_p_no_dlas         = (self.p_no_dlas    * np.ones( (num_models, num_qsos), dtype=np.int8 ))
         mask_inds = indices <= multi_dla_map_num_dla
-        
+
         model_posteriors_dla[mask_inds] = multi_highest_posterior[mask_inds]
         self.model_posteriors_dla = model_posteriors_dla
         self.multi_p_no_dlas      = multi_p_no_dlas
@@ -392,14 +393,12 @@ class QSOLoader(object):
         # This works but it is super slow
         else:
             self.sample_file = sample_file
-        #     self.prepare_roman_map_vals(sample_file=sample_file)
-        
 
         # make sure everything sums to unity
         assert np.all( 
             (self.model_posteriors.sum(axis=1) < 1.2) * 
             (self.model_posteriors.sum(axis=1) > 0.8) )
-        
+
     @staticmethod
     def _occams_model_posteriors(model_posteriors, occams_razor=10000):
         '''
@@ -1360,13 +1359,13 @@ class QSOLoader(object):
 
     def plot_cddf_parks(
             self, dla_parks, zmin=1., zmax=6., label='Parks', color=None, moment=False, 
-            p_thresh=0.98, snr_thresh=-2, prior=False, apply_p_dlas=False):
+            p_thresh=0.98, snr_thresh=-2, apply_p_dlas=False, **kwargs):
         '''
         plot the column density function of Parks' (2018) catalogue
         '''
         (l_N, cddf, xerrs) = self.column_density_function_parks(
             dla_parks, z_min=zmin, z_max=zmax, p_thresh=p_thresh, 
-            snr_thresh=snr_thresh, prior=prior, apply_p_dlas=apply_p_dlas)
+            snr_thresh=snr_thresh,)
 
         if moment:
             cddf *= 10**l_N
@@ -1380,7 +1379,7 @@ class QSOLoader(object):
         
     def column_density_function_parks(
             self, dla_parks, z_min=1., z_max=6., lnhi_nbins=30, lnhi_min=20., lnhi_max=23., 
-            p_thresh=0.98, snr_thresh=-2, prior=False, apply_p_dlas=False):
+            p_thresh=0.98, snr_thresh=-2, apply_p_dlas=False, **kwargs):
         '''
         Compute the column density function for Parks' catalogue.
         The column density function if the number of absorbers per 
@@ -1416,7 +1415,7 @@ class QSOLoader(object):
 
         # get Parks' point estimations
         unique_ids, log_nhis, z_dlas, min_z_dlas, max_z_dlas, snrs, all_snrs, p_dlas = self._get_parks_estimations(
-            dla_parks, p_thresh=p_thresh, prior=prior)
+            dla_parks, p_thresh=p_thresh, **kwargs)
 
         # filter based on snr threshold
         all_snr_inds = all_snrs > snr_thresh
@@ -1451,13 +1450,13 @@ class QSOLoader(object):
 
     def plot_line_density_park(
             self, dla_parks, zmin=2, zmax=4, label="Parks", color=None, 
-            p_thresh=0.98, snr_thresh=-2, prior=False, apply_p_dlas=False):
+            p_thresh=0.98, snr_thresh=-2, apply_p_dlas=False, **kwargs):
         '''
         plot the line density as a function of redshift
         '''
         z_cent, dNdX, xerrs = self.line_density_park(
             dla_parks, z_min=zmin, z_max=zmax, 
-            p_thresh=p_thresh, snr_thresh=snr_thresh, prior=prior, apply_p_dlas=apply_p_dlas)
+            p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=apply_p_dlas, **kwargs)
 
         plt.errorbar(z_cent, dNdX, xerr=xerrs, fmt='o', label=label, color=color)
         plt.xlabel(r'z')
@@ -1467,7 +1466,7 @@ class QSOLoader(object):
 
     def line_density_park(
             self, dla_parks, z_min=2, z_max=4, lnhi_min=20.3, 
-            bins_per_z=6, p_thresh=0.98, snr_thresh=-2, prior=False, apply_p_dlas=False):
+            bins_per_z=6, p_thresh=0.98, snr_thresh=-2, apply_p_dlas=False, **kwargs):
         '''
         Compute the line density, the total number of DLA slightlines divided by
         the total number of sightlines, multiplied by dL/dX,
@@ -1480,7 +1479,7 @@ class QSOLoader(object):
 
         # get Parks' point estimations
         unique_ids, log_nhis, z_dlas, min_z_dlas, max_z_dlas, snrs, all_snrs, p_dlas = self._get_parks_estimations(
-            dla_parks, p_thresh=p_thresh, prior=prior)
+            dla_parks, p_thresh=p_thresh, **kwargs)
 
         # filter based on snr threshold
         all_snr_inds = all_snrs > snr_thresh

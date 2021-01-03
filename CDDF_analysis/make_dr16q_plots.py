@@ -10,6 +10,7 @@ import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from .qso_loader import QSOLoader, file_loader
+from .qso_loader_dr16q import QSOLoaderDR16Q
 from .set_parameters import *
 from .dla_data import dla_data
 
@@ -428,3 +429,113 @@ def plot_omega_dla(z_cent: np.ndarray, omega_dla: np.ndarray, omega_dla_68: np.n
     plt.xlabel(r"z")
     plt.ylabel(r"$10^3 \times \Omega_\mathrm{DLA}$")
     plt.xlim(zmin, zmax)
+
+
+def do_Parks_CDDF(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, snr_thresh: float = -2.0, lyb: bool = False, search_range_from_ours: bool = False):
+    '''
+    Plot the column density function of Parks (2018)
+
+    Parameters:
+    ----
+    dla_parks (str) : path to Parks' `prediction_DR12.json`
+    '''
+    dla_data.noterdaeme_12_data()
+    (l_N, cddf) = qsos.plot_cddf_parks(
+        dla_parks, zmax=5, color="blue", p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
+        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+    np.savetxt(
+        os.path.join(subdir, "cddf_parks_all.txt"),
+        (l_N, cddf))
+    plt.xlim(1e20, 1e23)
+    plt.ylim(1e-28, 5e-21)
+    plt.legend(loc=0)
+    save_figure(os.path.join(subdir, "cddf_parks"))
+    plt.clf()
+
+    # Evolution with redshift
+    (l_N, cddf) = qsos.plot_cddf_parks(
+        dla_parks, zmin=4, zmax=5, label="4-5", color="brown", 
+        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
+        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+    np.savetxt(
+        os.path.join(subdir, "cddf_parks_z45.txt"), (l_N, cddf))
+    (l_N, cddf) = qsos.plot_cddf_parks(
+        dla_parks, zmin=3, zmax=4, label="3-4", color="black", 
+        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
+        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+    np.savetxt(
+        os.path.join(subdir, "cddf_parks_z34.txt"), (l_N, cddf))
+    (l_N, cddf) = qsos.plot_cddf_parks(
+        dla_parks, zmin=2.5, zmax=3, label="2.5-3", color="green", 
+        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
+        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+    np.savetxt(
+        os.path.join(subdir, "cddf_parks_z253.txt"), (l_N, cddf))
+    (l_N, cddf) = qsos.plot_cddf_parks(
+        dla_parks, zmin=2, zmax=2.5, label="2-2.5", color="blue", 
+        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
+        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+    np.savetxt(
+        os.path.join(subdir, "cddf_parks_z225.txt"), (l_N, cddf))
+
+    plt.xlim(1e20, 1e23)
+    plt.ylim(1e-28, 5e-21)
+    plt.legend(loc=0)
+    save_figure(os.path.join(subdir, "cddf_zz_parks"))
+    plt.clf()
+
+def do_Parks_dNdX(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, snr_thresh: float = -2.0, lyb: bool = False, search_range_from_ours: bool = False):
+    '''
+    Plot dNdX for Parks' (2018)
+
+    Parameters:
+    ----
+    dla_parks (str) : path to Parks' `prediction_DR12.json`
+    '''
+    dla_data.dndx_not()
+    dla_data.dndx_pro()
+    z_cent, dNdX = qsos.plot_line_density_park(
+        dla_parks, zmax=5, p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
+        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+    np.savetxt(os.path.join(subdir, "dndx_all.txt"), (z_cent, dNdX))
+
+    plt.legend(loc=0)
+    plt.ylim(0, 0.16)
+    save_figure(os.path.join(subdir, "dndx_parks"))
+    plt.clf()
+
+def do_Parks_snr_check(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, lyb: bool = False, search_range_from_ours: bool = False):
+    '''
+    Check effect of removing spectra with low SNRs.
+    '''
+    snrs_list = (-2, 2, 4, 8)
+
+    # CDDF
+    dla_data.noterdaeme_12_data()
+    for i,snr_thresh in enumerate(snrs_list):
+        (l_N, cddf) = qsos.plot_cddf_parks(
+            dla_parks, zmax=5, p_thresh=p_thresh, color=cmap( (i + 1)  / len(snrs_list)),
+            snr_thresh=snr_thresh, label="Parks SNR > {:d}".format(snr_thresh), 
+            apply_p_dlas=False,
+            prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+
+    plt.xlim(1e20, 1e23)
+    plt.ylim(1e-28, 5e-21)
+    plt.legend(loc=0)
+    save_figure(os.path.join(subdir, "cddf_parks_snr"))
+    plt.clf()
+    
+    # dN/dX
+    dla_data.dndx_not()
+    dla_data.dndx_pro()
+    for i,snr_thresh in enumerate(snrs_list):
+        z_cent, dNdX = qsos.plot_line_density_park(
+            dla_parks, zmax=5, p_thresh=p_thresh, color=cmap( (i + 1)  / len(snrs_list)),
+            snr_thresh=snr_thresh, label="Parks SNR > {:d}".format(snr_thresh), 
+            apply_p_dlas=False,
+            prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+
+    plt.legend(loc=0)
+    plt.ylim(0, 0.16)
+    save_figure(os.path.join(subdir, "dndx_parks_snr"))
+    plt.clf()
