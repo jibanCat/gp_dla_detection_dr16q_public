@@ -2,7 +2,8 @@
 Make plots for the Multi-DLA paper
 '''
 import os
-import numpy as np 
+import numpy as np
+from scipy.stats import pearsonr
 from scipy.interpolate import interp1d
 from astropy.io import fits
 
