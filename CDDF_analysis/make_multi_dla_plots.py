@@ -849,3 +849,55 @@ def do_dr12q_dr16q_spec_comparison(
             save_figure("plot_specs/Comparison_dr12q_in_dr16q_dr16q_train_dr16q_snrs_leq_4_pdlas_0_5_zqso_4/this_{}_DR12_DR16_GP".format(qsos_dr16q.unique_ids[nspec]))
             plt.clf()
             plt.close()
+
+def do_MAP_hist2d(qsos):
+    '''
+    Do the hist2d in between z_true vs z_map
+    '''
+    map_z_dlas, true_z_dlas, map_log_nhis, true_log_nhis, real_index = qsos.make_MAP_hist2d(
+        p_thresh=0)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
+    (h1, x1edges, y1edges, im1) = ax1.hist2d(map_z_dlas, true_z_dlas,
+        bins = int(np.sqrt(map_z_dlas.shape[0])), cmap='viridis')
+    # a perfect prediction straight line
+    z_dlas_plot = np.linspace(2.0, 5.0, 100)
+    ax1.plot(z_dlas_plot, z_dlas_plot)
+    ax1.set_xlabel(r"$z_{{DLA,MAP}}$")
+    ax1.set_ylabel(r"$z_{{DLA,concordance}}$")
+    fig.colorbar(im1, ax=ax1)
+
+    (h2, x2edges, y2edges, im2) = ax2.hist2d(map_log_nhis, true_log_nhis,
+        bins = int(np.sqrt(map_z_dlas.shape[0])), cmap='viridis')
+
+    # a perfect prediction straight line
+    log_nhi_plot = np.linspace(20, 22.5, 100)
+    ax2.plot(log_nhi_plot, log_nhi_plot)
+
+    # # 3rd polynomial fit
+    # poly_fit =  np.poly1d( np.polyfit(map_log_nhis, true_log_nhis, 4 ) )
+    # ax2.plot(log_nhi_plot, poly_fit(log_nhi_plot), color="white", ls='--')
+
+    ax2.set_xlabel(r"$\log N_{{HI,MAP}}$")
+    ax2.set_ylabel(r"$\log N_{{HI,concordance}}$")
+    ax2.set_xlim(20, 22.5)
+    ax2.set_ylim(20, 22.5)
+    fig.colorbar(im2, ax=ax2)
+
+    print("Pearson Correlation for (map_z_dlas,   true_z_dlas) : ",
+        pearsonr(map_z_dlas, true_z_dlas))
+    print("Pearson Correlation for (map_log_nhis, true_log_nhis) : ",
+        pearsonr(map_log_nhis, true_log_nhis))
+
+    # examine the pearson correlation per log nhi bins
+    log_nhi_bins = [20, 20.5, 21, 23]
+
+    for (min_log_nhi, max_log_nhi) in zip(log_nhi_bins[:-1], log_nhi_bins[1:]):
+        ind  =  (map_log_nhis > min_log_nhi) & (map_log_nhis < max_log_nhi)
+        ind = ind & (true_log_nhis > min_log_nhi) & (true_log_nhis < max_log_nhi)
+        
+        print("Map logNHI Bin [{}, {}] Pearson Correlation for (map_log_nhis, true_log_nhi) : ".format(
+            min_log_nhi, max_log_nhi),
+            pearsonr(map_log_nhis[ind], true_log_nhis[ind]))
+
+    save_figure("MAP_hist2d_concordance")
