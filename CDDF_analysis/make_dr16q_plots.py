@@ -438,7 +438,7 @@ def do_Parks_CDDF(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/D
 
     Parameters:
     ----
-    dla_parks (str) : path to Parks' `prediction_DR12.json`
+    dla_parks (str) : path to Parks' CNN model in the DR16Q
     '''
     dla_data.noterdaeme_12_data()
     (l_N, cddf) = qsos.plot_cddf_parks(
@@ -487,11 +487,11 @@ def do_Parks_CDDF(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/D
 
 def do_Parks_dNdX(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, snr_thresh: float = -2.0, lyb: bool = False, search_range_from_ours: bool = False):
     '''
-    Plot dNdX for Parks' (2018)
+    Plot dNdX for Parks' CNN model in the DR16Q
 
     Parameters:
     ----
-    dla_parks (str) : path to Parks' `prediction_DR12.json`
+    dla_parks (str) : path to Parks' CNN model in the DR16Q
     '''
     dla_data.dndx_not()
     dla_data.dndx_pro()
@@ -503,6 +503,24 @@ def do_Parks_dNdX(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/D
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
     save_figure(os.path.join(subdir, "dndx_parks"))
+    plt.clf()
+
+def do_Parks_OmegaDLA(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", zmin: float = 2.0, zmax: float = 4.0, p_thresh: float = 0.98, snr_thresh: float = -2.0, lyb: bool = False, search_range_from_ours: bool = False):
+    """
+    Plot OmegaDLA for Parks's CNN model in DR16Q
+    """
+    #Omega_DLA
+    dla_data.omegahi_not()
+    dla_data.omegahi_pro()
+    dla_data.crighton_omega()
+
+    (z_cent, omega_dla) = qsos.plot_omega_dla_parks(dla_parks, zmin=zmin, zmax=zmax, p_thresh=p_thresh, snr_thresh=snr_thresh, lyb=lyb, search_range_from_ours=search_range_from_ours)
+
+    np.savetxt(os.path.join(subdir,"omega_dla_all.txt"), (z_cent, omega_dla))
+    plt.legend(loc=0)
+    plt.xlim(2, 5)
+    plt.ylim(0, 2.5)
+    save_figure(os.path.join(subdir,"omega_parks"))
     plt.clf()
 
 def do_Parks_snr_check(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, lyb: bool = False, search_range_from_ours: bool = False):

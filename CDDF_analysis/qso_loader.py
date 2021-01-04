@@ -29,7 +29,7 @@ from scipy.linalg import lapack
 
 from matplotlib import pyplot as plt
 from .set_parameters import *
-from .calc_cddf import HubbleByH0, path_length_int
+from .calc_cddf import HubbleByH0, path_length_int, rho_crit
 from .voigt import Voigt_absorption
 from .effective_optical_depth import effective_optical_depth
 
@@ -1553,11 +1553,92 @@ class QSOLoader(object):
 
         return (z_cent[ii], dNdX, xerrs)
 
+    def omega_dla_parks(self, dla_parks, z_min=2, z_max=4, hubble=0.7, lnhi_max=23.0, lnhi_min=20.3,
+            bins_per_z=6, p_thresh=0.98, snr_thresh=-2, apply_p_dlas=False, **kwargs):
+        """
+        Compute the matter density of DLAs as a function of redshift, by summing DLAs.
+        This gives us:
+            Omega_DLA = m_P H_0 / (c rho_c) * sum(NHI) / dX
+
+        Note: we do not have variance in this function.
+        """
+        nbins = np.max([ int( (z_max - z_min) * bins_per_z ), 1])
+        
+        # get the redshift bins
+        z_bins = np.linspace(z_min, z_max, nbins + 1)
+
+        # get Parks' point estimations
+        unique_ids, log_nhis, z_dlas, min_z_dlas, max_z_dlas, snrs, all_snrs, p_dlas = self._get_parks_estimations(
+            dla_parks, p_thresh=p_thresh, **kwargs)
+
+        # filter based on snr threshold
+        all_snr_inds = all_snrs > snr_thresh
+        snr_inds     = snrs > snr_thresh
+
+        min_z_dlas = min_z_dlas[all_snr_inds]
+        max_z_dlas = max_z_dlas[all_snr_inds]
+
+        # get the NHI * E(DLA) within redshift bins
+        # desired samples 
+        inds = (log_nhis > lnhi_min) * (log_nhis < lnhi_max) * (z_dlas < z_max) * (z_dlas > z_min)
+        inds = np.logical_and( snr_inds, inds )
+
+        log_nhis   = log_nhis[inds]
+        z_dlas     = z_dlas[inds]
+        p_dlas     = p_dlas[inds]
+
+        # the moment: NHI * E(DLA)
+        weight = 10 ** log_nhis
+        # ref: https://github.com/sbird/fake_spectra/blob/master/fake_spectra/spectra.py#L976
+        if apply_p_dlas:
+            nhi_tot_f_N, NHI_table = np.histogram(z_dlas, z_bins, weights=weight * p_dlas)
+        else:
+            nhi_tot_f_N, NHI_table = np.histogram(z_dlas, z_bins, weights=weight)
+
+        # This returns the total matter in DLAs at each redshift in atoms/cm^2.
+        # Need to turn this into g/cm^2, divide by path length in (comoving) cm, and then divide by rho_crit.
+        # proton mass in g
+        protonmass = 1.67262178e-24
+
+        # calc dX for z_bins
+        dX = np.array([ self.path_length(min_z_dlas, max_z_dlas, z_m, z_x) 
+            for (z_m, z_x) in zip(z_bins[:-1], z_bins[1:]) ])
+        # H0 in 1/s units
+        h100 = 3.2407789e-18 * hubble
+        # Speed of light in cm/s
+        light = 2.99e10
+        conversion = protonmass * h100 / light / dX / rho_crit(hubble=hubble)
+        omega_DLA = np.array(nhi_tot_f_N) * conversion
+
+        z_cent = np.array( [ (z_x + z_m) / 2. for (z_m, z_x) in zip(z_bins[:-1], z_bins[1:]) ] )
+        xerrs  = (z_cent - z_bins[:-1], z_bins[1:] - z_cent)
+
+        return (z_cent, omega_DLA, xerrs)
+
+
+    def plot_omega_dla_parks(self, dla_parks, zmin=2, zmax=4, hubble=0.7, lnhi_max=23.0, lnhi_min=20.3,
+            bins_per_z=6, p_thresh=0.98, snr_thresh=-2, apply_p_dlas=False, label="CNN", color=None, **kwargs):
+        """Plot omega_DLA as a function of redshift"""
+        (z_cent, omega_DLA, xerrs) = self.omega_dla_parks(dla_parks, z_min=zmin, z_max=zmax, hubble=hubble, lnhi_max=lnhi_max, lnhi_min=lnhi_min,
+            bins_per_z=bins_per_z, p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=apply_p_dlas, **kwargs)
+        plt.errorbar(
+            z_cent,
+            1000 * omega_DLA,
+            xerr=xerrs,
+            fmt="s",
+            label=label,
+            color=color,
+        )
+        plt.xlabel(r"z")
+        plt.ylabel(r"$10^3 \times \Omega_\mathrm{DLA}$")
+
+        return z_cent, omega_DLA
+
     def column_density_function_noterdaeme(
             self, dla_noterdaeme, los_noterdaeme, z_min, z_max, lnhi_nbins=30, lnhi_min=20., lnhi_max=23.,
             snr_thresh=4):
         '''
-        Compute the column density distribution funciont for Noterdaeme DR12 catalogue.
+        Compute the column density distribution function for Noterdaeme DR12 catalogue.
 
         This should follow the convention of sbird's plot
 
