@@ -88,12 +88,14 @@ class DLACatalogue(object):
         catalog_file: str = "catalog.mat",
         snr: int = -2,
         lowzcut: bool = False,
+        highzcut: bool = False,
         second: Union[int, bool] = False,
         sub_dla: bool = True,
         occams_razor: int = 10000,
         z_dla_minimum: float = 0.1,
         raw_distfile: str = "DR16Q_v4.fits",  # DR16Q only
         zestimate_cut: bool = False,  # DR16Q only; remove zestimate disagreements
+        delta_z_qso: float = 0.3,     # DR16Q only; remove zestimate disagreements
         is_qso_final_cut: bool = False,  # DR16Q only; only take final QSO samples
         class_person_cut: bool = False,  # DR16Q only; only take non-BAL samples
         z_source_cut: bool = False,  # DR16Q only; remove source_z='pipe' and z > 5
@@ -128,6 +130,10 @@ class DLACatalogue(object):
         # Exclude spectra closer to the DLA than this, which has fewer DLAs than average.
         self.lowzcut = lowzcut
         self.proximity_zone = 0.1
+        # Exclude spectra closer to the tail of the spectrum, which has more dubious DLAs than average.
+        self.highzcut = highzcut
+        self.tail_zone = 0.1
+
         self.raw_file = raw_file
         self.processed_file = processed_file
         self.catalog_file = catalog_file
@@ -215,7 +221,7 @@ class DLACatalogue(object):
         # Note: -1 means no measurements, we should not include those values.
         self.hdu = fits.open(raw_distfile)
         if zestimate_cut:
-            delta_z_qso = 1
+            # delta_z_qso = 1
 
             # the best redshift measurement column, only in DR16Q
             z_best = self.hdu[1].data["Z"][self.test_ind]
@@ -831,6 +837,11 @@ class DLACatalogue(object):
                 [np.min([max_z_dlas, self.proximity(max_z_dlas)], axis=0), min_z_dlas],
                 axis=0,
             )
+        if self.highzcut:
+            min_z_dlas = np.min(
+                [np.max([min_z_dlas, self.tail(min_z_dlas)], axis=0), max_z_dlas],
+                axis=0,
+            )
         assert np.all(max_z_dlas - min_z_dlas >= 0)
         # Filter spectra that aren't in our redshift range
         i2 = np.where(np.logical_and(min_z_dlas < z_max, max_z_dlas > z_min))
@@ -1392,6 +1403,11 @@ class DLACatalogue(object):
         """Remove a redshift range close to the quasar"""
         dz = self.proximity_zone
         return zqso - dz
+    
+    def tail(self, zmin):
+        """Remove a redshift range close to the tail of the spectrum"""
+        dz = self.tail_zone
+        return zmin + dz
 
     def _split_distributions_single(
         self,
@@ -1432,14 +1448,17 @@ class DLACatalogue(object):
             (lnhi_vals, redshifts) = self._get_sample_params(spec, second=second)
             # The low cutoff redshift.
             upper_z = ured
+            lower_z = lred
             if self.lowzcut:
                 upper_z = np.min([self.proximity(self.z_max(spec)), ured])
+            if self.highzcut:
+                lower_z = np.max([self.tail(self.z_min(spec)), lred])
             # Select only samples with a DLA value, within the redshift we want.
             desired_samples = (
                 (lnhi_vals > lnhi_min)
                 * (lnhi_vals < lnhi_max)
                 * (redshifts < upper_z)
-                * (redshifts > lred)
+                * (redshifts > lower_z)
             )
             if self.filter_noisy_pixels:
                 # Exclude pixels which have too large noise within them

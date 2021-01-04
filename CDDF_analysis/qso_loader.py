@@ -40,8 +40,8 @@ class GPLoader(object):
     '''
     Class to store parameters of our GP model
     '''
-    tau_0_kim = 0.0023
-    beta_kim  =   3.65
+    tau_0_kim = 0.00554
+    beta_kim  =   3.182
 
     def __init__(self, rest_wavelengths, mu, M, log_tau_0, log_beta, log_c_0, log_omega, num_forest_lines: int = 31):
         self.rest_wavelengths = rest_wavelengths
