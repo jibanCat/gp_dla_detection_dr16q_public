@@ -3,6 +3,7 @@ Make plots for the Multi-DLA paper
 """
 import os
 import numpy as np
+from scipy.stats import pearsonr
 from scipy.interpolate import interp1d
 from astropy.io import fits
 
@@ -633,3 +634,64 @@ def do_MAP_parks_comparison(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/d
     plt.legend(loc=0)
     save_figure("MAP_log_nhi_evolution_parks")
     plt.clf()
+
+def do_MAP_hist2d_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", dla_confidence: float = 0.98, num_dlas: int = 1):
+    '''
+    Do the hist2d in between z_true vs z_map
+    '''
+    if 'dla_catalog_parks' not in dir(qsos):
+        qsos.load_dla_parks(dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1)
+
+    _, _, _, gp_z_dlas, gp_log_nhis, cnn_z_dlas, cnn_log_nhis = qsos.make_MAP_parks_comparison(
+        qsos.dla_catalog_parks, num_dlas=num_dlas, dla_confidence=dla_confidence, return_map_values=True)
+
+    # expand the arrays
+    gp_z_dlas = gp_z_dlas.ravel()
+    gp_log_nhis = gp_log_nhis.ravel()
+    cnn_z_dlas = cnn_z_dlas.ravel()
+    cnn_log_nhis = cnn_log_nhis.ravel()
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
+    (h1, x1edges, y1edges, im1) = ax1.hist2d(gp_z_dlas, cnn_z_dlas,
+        bins = int(np.sqrt(gp_z_dlas.shape[0])), cmap='viridis')
+    # a perfect prediction straight line
+    z_dlas_plot = np.linspace(2.0, 5.0, 100)
+    ax1.plot(z_dlas_plot, z_dlas_plot)
+    ax1.set_xlabel(r"$z_{{DLA,MAP}}$")
+    ax1.set_ylabel(r"$z_{{DLA,CNN}}$")
+    fig.colorbar(im1, ax=ax1)
+
+    (h2, x2edges, y2edges, im2) = ax2.hist2d(gp_log_nhis, cnn_log_nhis,
+        bins = int(np.sqrt(gp_log_nhis.shape[0])), cmap='viridis')
+
+    # a perfect prediction straight line
+    log_nhi_plot = np.linspace(20, 22.5, 100)
+    ax2.plot(log_nhi_plot, log_nhi_plot)
+
+    # # 3rd polynomial fit
+    # poly_fit =  np.poly1d( np.polyfit(map_log_nhis, true_log_nhis, 4 ) )
+    # ax2.plot(log_nhi_plot, poly_fit(log_nhi_plot), color="white", ls='--')
+
+    ax2.set_xlabel(r"$\log N_{{HI,MAP}}$")
+    ax2.set_ylabel(r"$\log N_{{HI,CNN}}$")
+    # ax2.set_xlim(20, 22.5)
+    # ax2.set_ylim(20, 22.5)
+    fig.colorbar(im2, ax=ax2)
+
+    print("Pearson Correlation for (map_z_dlas,   cnn_z_dlas) : ",
+        pearsonr(gp_z_dlas, cnn_z_dlas))
+    print("Pearson Correlation for (map_log_nhis, cnn_log_nhis) : ",
+        pearsonr(gp_log_nhis, cnn_log_nhis))
+
+    # examine the pearson correlation per log nhi bins
+    log_nhi_bins = [20, 20.5, 21, 23]
+
+    for (min_log_nhi, max_log_nhi) in zip(log_nhi_bins[:-1], log_nhi_bins[1:]):
+        ind  =  (gp_log_nhis > min_log_nhi) & (gp_log_nhis < max_log_nhi)
+        ind = ind & (cnn_log_nhis > min_log_nhi) & (cnn_log_nhis < max_log_nhi)
+        
+        print("Map logNHI Bin [{}, {}] Pearson Correlation for (map_log_nhis, true_log_nhi) : ".format(
+            min_log_nhi, max_log_nhi),
+            pearsonr(gp_log_nhis[ind], cnn_log_nhis[ind]))
+
+    save_figure("MAP_hist2d_GP_CNN")
