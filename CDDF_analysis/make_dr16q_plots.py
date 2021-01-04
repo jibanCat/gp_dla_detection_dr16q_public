@@ -182,7 +182,12 @@ def do_procedure_plots(qsos_full_int: QSOLoader, qsos_original: QSOLoader):
     save_figure("covariance_matrix")
     plt.clf()
 
-def do_cddf_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CDDF_analysis", subdir_occams_lower: str = "CDDF_analysis"):
+
+def do_cddf_occams(
+    subdir: str = "CDDF_analysis",
+    subdir_occams_upper: str = "CDDF_analysis",
+    subdir_occams_lower: str = "CDDF_analysis",
+):
     """
     Make CDDF plots with systematics from Occams razors.
     """
@@ -194,7 +199,7 @@ def do_cddf_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CD
 
     cddf68 = np.full((N, 2), fill_value=np.nan)
     cddf95 = np.full((N, 2), fill_value=np.nan)
-    (l_N, cddf, cddf68[:,0], cddf68[:,1], cddf95[:,0],cddf95[:,1]) = cddf_all
+    (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
     plot_cddf(l_N, cddf, cddf68, cddf95)
 
@@ -204,7 +209,7 @@ def do_cddf_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CD
 
     cddf68 = np.full((N, 2), fill_value=np.nan)
     cddf95 = np.full((N, 2), fill_value=np.nan)
-    (l_N, cddf, cddf68[:,0], cddf68[:,1], cddf95[:,0],cddf95[:,1]) = cddf_all
+    (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
     plot_cddf(l_N, cddf, cddf68, cddf95, label="GP Occams upper", color="C1")
 
@@ -214,7 +219,7 @@ def do_cddf_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CD
 
     cddf68 = np.full((N, 2), fill_value=np.nan)
     cddf95 = np.full((N, 2), fill_value=np.nan)
-    (l_N, cddf, cddf68[:,0], cddf68[:,1], cddf95[:,0],cddf95[:,1]) = cddf_all
+    (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
     plot_cddf(l_N, cddf, cddf68, cddf95, label="GP Occams lower", color="C2")
     plt.xlim(1e20, 1e23)
@@ -225,7 +230,17 @@ def do_cddf_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CD
     plt.clf()
 
 
-def plot_cddf(l_N: np.ndarray, cddf: np.ndarray, cddf68: np.ndarray, cddf95: np.ndarray, lnhi_nbins: int = 30, lnhi_min: float = 20.0, lnhi_max: float = 23.0, color="blue", label="GP"):
+def plot_cddf(
+    l_N: np.ndarray,
+    cddf: np.ndarray,
+    cddf68: np.ndarray,
+    cddf95: np.ndarray,
+    lnhi_nbins: int = 30,
+    lnhi_min: float = 20.0,
+    lnhi_max: float = 23.0,
+    color="blue",
+    label="GP",
+):
     """
     Plot cddf from variables, using same methods as calc_cddf.plot_cddf
     """
@@ -235,9 +250,7 @@ def plot_cddf(l_N: np.ndarray, cddf: np.ndarray, cddf68: np.ndarray, cddf95: np.
     xerrs = (10 ** l_N - 10 ** l_nhi[:-1], 10 ** l_nhi[1:] - 10 ** l_N)
 
     # two sigma
-    plt.fill_between(
-        10 ** l_N, cddf95[:, 0], cddf95[:, 1], color="grey", alpha=0.5
-    )
+    plt.fill_between(10 ** l_N, cddf95[:, 0], cddf95[:, 1], color="grey", alpha=0.5)
 
     # if has values
     yerr = (cddf - cddf68[:, 0], cddf68[:, 1] - cddf)
@@ -272,7 +285,12 @@ def plot_cddf(l_N: np.ndarray, cddf: np.ndarray, cddf68: np.ndarray, cddf95: np.
     plt.xlabel(r"$N_\mathrm{HI}$ (cm$^{-2}$)")
     plt.ylabel(r"$f(N_\mathrm{HI})$")
 
-def do_dndx_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CDDF_analysis", subdir_occams_lower: str = "CDDF_analysis"):
+
+def do_dndx_occams(
+    subdir: str = "CDDF_analysis",
+    subdir_occams_upper: str = "CDDF_analysis",
+    subdir_occams_lower: str = "CDDF_analysis",
+):
     """
     Make dNdX plots with systematics from Occams razors.
     """
@@ -285,7 +303,7 @@ def do_dndx_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CD
 
     dndx68 = np.full((N, 2), fill_value=np.nan)
     dndx95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, dNdX, dndx68[:,0], dndx68[:,1], dndx95[:,0], dndx95[:,1]) = dndx_all
+    (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
     plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C0")
 
@@ -295,7 +313,7 @@ def do_dndx_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CD
 
     dndx68 = np.full((N, 2), fill_value=np.nan)
     dndx95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, dNdX, dndx68[:,0], dndx68[:,1], dndx95[:,0], dndx95[:,1]) = dndx_all
+    (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
     plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C1", label="GP Occams upper")
 
@@ -305,17 +323,27 @@ def do_dndx_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CD
 
     dndx68 = np.full((N, 2), fill_value=np.nan)
     dndx95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, dNdX, dndx68[:,0], dndx68[:,1], dndx95[:,0], dndx95[:,1]) = dndx_all
+    (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
     plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C2", label="GP Occams lower")
     plt.legend(loc=0)
-    plt.ylim(0,0.16)
+    plt.ylim(0, 0.16)
     plt.tight_layout()
-    save_figure(os.path.join(subdir,"dndx_occams"))
+    save_figure(os.path.join(subdir, "dndx_occams"))
     plt.clf()
 
 
-def plot_line_density(z_cent: np.ndarray, dNdX: np.ndarray, dndx68: np.ndarray, dndx95: np.ndarray, zmin: float = 2., zmax: float = 5., label: str = "GP", color="blue", bins_per_z: int = 6):
+def plot_line_density(
+    z_cent: np.ndarray,
+    dNdX: np.ndarray,
+    dndx68: np.ndarray,
+    dndx95: np.ndarray,
+    zmin: float = 2.0,
+    zmax: float = 5.0,
+    label: str = "GP",
+    color="blue",
+    bins_per_z: int = 6,
+):
     """Plot the line density as a function of redshift"""
     # Get the redshifts
     nbins = np.max([int((zmax - zmin) * bins_per_z), 1])
@@ -333,7 +361,11 @@ def plot_line_density(z_cent: np.ndarray, dNdX: np.ndarray, dndx68: np.ndarray, 
     plt.xlim(zmin, zmax)
 
 
-def do_omega_dla_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str = "CDDF_analysis", subdir_occams_lower: str = "CDDF_analysis"):
+def do_omega_dla_occams(
+    subdir: str = "CDDF_analysis",
+    subdir_occams_upper: str = "CDDF_analysis",
+    subdir_occams_lower: str = "CDDF_analysis",
+):
     """
     Make OmegaDLA plots with systematics from Occams razors.
     """
@@ -347,7 +379,14 @@ def do_omega_dla_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str 
 
     omega_dla_68 = np.full((N, 2), fill_value=np.nan)
     omega_dla_95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) = omega_dla_all
+    (
+        z_cent,
+        omega_dla,
+        omega_dla_68[:, 0],
+        omega_dla_68[:, 1],
+        omega_dla_95[:, 0],
+        omega_dla_95[:, 1],
+    ) = omega_dla_all
 
     plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C0")
 
@@ -357,9 +396,23 @@ def do_omega_dla_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str 
 
     omega_dla_68 = np.full((N, 2), fill_value=np.nan)
     omega_dla_95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) = omega_dla_all
+    (
+        z_cent,
+        omega_dla,
+        omega_dla_68[:, 0],
+        omega_dla_68[:, 1],
+        omega_dla_95[:, 0],
+        omega_dla_95[:, 1],
+    ) = omega_dla_all
 
-    plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C1", label="GP Occams upper")
+    plot_omega_dla(
+        z_cent,
+        omega_dla,
+        omega_dla_68,
+        omega_dla_95,
+        color="C1",
+        label="GP Occams upper",
+    )
 
     # Occams lower
     omega_dla_all = np.loadtxt(os.path.join(subdir_occams_lower, "omega_dla_all.txt"))
@@ -367,16 +420,31 @@ def do_omega_dla_occams(subdir: str = "CDDF_analysis", subdir_occams_upper: str 
 
     omega_dla_68 = np.full((N, 2), fill_value=np.nan)
     omega_dla_95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) = omega_dla_all
+    (
+        z_cent,
+        omega_dla,
+        omega_dla_68[:, 0],
+        omega_dla_68[:, 1],
+        omega_dla_95[:, 0],
+        omega_dla_95[:, 1],
+    ) = omega_dla_all
 
-    plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C2", label="GP Occams lower")
+    plot_omega_dla(
+        z_cent,
+        omega_dla,
+        omega_dla_68,
+        omega_dla_95,
+        color="C2",
+        label="GP Occams lower",
+    )
 
     plt.legend(loc=0)
-    plt.xlim(2,5)
-    plt.ylim(0,2.5)
+    plt.xlim(2, 5)
+    plt.ylim(0, 2.5)
     plt.tight_layout()
-    save_figure(os.path.join(subdir,"omega_occams"))
+    save_figure(os.path.join(subdir, "omega_occams"))
     plt.clf()
+
 
 def do_omega_dla_XQ100(subdir: str = "CDDF_analysis"):
     """
@@ -393,18 +461,37 @@ def do_omega_dla_XQ100(subdir: str = "CDDF_analysis"):
 
     omega_dla_68 = np.full((N, 2), fill_value=np.nan)
     omega_dla_95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) = omega_dla_all
+    (
+        z_cent,
+        omega_dla,
+        omega_dla_68[:, 0],
+        omega_dla_68[:, 1],
+        omega_dla_95[:, 0],
+        omega_dla_95[:, 1],
+    ) = omega_dla_all
 
     plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C0")
 
     plt.legend(loc=0)
-    plt.xlim(2,5)
-    plt.ylim(0,2.5)
+    plt.xlim(2, 5)
+    plt.ylim(0, 2.5)
     plt.tight_layout()
-    save_figure(os.path.join(subdir,"omega_xq100"))
+    save_figure(os.path.join(subdir, "omega_xq100"))
     plt.clf()
 
-def plot_omega_dla(z_cent: np.ndarray, omega_dla: np.ndarray, omega_dla_68: np.ndarray, omega_dla_95: np.ndarray, zmin: float = 2., zmax: float = 5., label: str = "GP", color: str = "blue", twosigma: bool = True, bins_per_z: int = 6):
+
+def plot_omega_dla(
+    z_cent: np.ndarray,
+    omega_dla: np.ndarray,
+    omega_dla_68: np.ndarray,
+    omega_dla_95: np.ndarray,
+    zmin: float = 2.0,
+    zmax: float = 5.0,
+    label: str = "GP",
+    color: str = "blue",
+    twosigma: bool = True,
+    bins_per_z: int = 6,
+):
     """Plot omega_DLA as a function of redshift, with full Bayesian errors"""
     nbins = np.max([int((zmax - zmin) * bins_per_z), 1])
     z_bins = np.linspace(zmin, zmax, nbins + 1)
@@ -426,27 +513,43 @@ def plot_omega_dla(z_cent: np.ndarray, omega_dla: np.ndarray, omega_dla_68: np.n
         omega_dla - omega_dla_68[:, 0],
         omega_dla_68[:, 1] - omega_dla,
     )
-    plt.errorbar(z_cent, omega_dla, yerr=yerr, xerr=xerrs, fmt="s", label=label, color=color)
+    plt.errorbar(
+        z_cent, omega_dla, yerr=yerr, xerr=xerrs, fmt="s", label=label, color=color
+    )
     plt.xlabel(r"z")
     plt.ylabel(r"$10^3 \times \Omega_\mathrm{DLA}$")
     plt.xlim(zmin, zmax)
 
 
-def do_Parks_CDDF(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, snr_thresh: float = -2.0, lyb: bool = False, search_range_from_ours: bool = False):
-    '''
+def do_Parks_CDDF(
+    qsos: QSOLoaderDR16Q,
+    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
+    p_thresh: float = 0.98,
+    snr_thresh: float = -2.0,
+    lyb: bool = False,
+    search_range_from_ours: bool = False,
+):
+    """
     Plot the column density function of Parks (2018)
 
     Parameters:
     ----
     dla_parks (str) : path to Parks' CNN model in the DR16Q
-    '''
+    """
     dla_data.noterdaeme_12_data()
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks, zmax=5, color="blue", p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
-        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
-    np.savetxt(
-        os.path.join(subdir, "cddf_parks_all.txt"),
-        (l_N, cddf))
+        dla_parks,
+        zmax=5,
+        color="blue",
+        p_thresh=p_thresh,
+        snr_thresh=snr_thresh,
+        apply_p_dlas=False,
+        prior=False,
+        lyb=lyb,
+        search_range_from_ours=search_range_from_ours,
+    )
+    np.savetxt(os.path.join(subdir, "cddf_parks_all.txt"), (l_N, cddf))
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
@@ -455,29 +558,61 @@ def do_Parks_CDDF(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/D
 
     # Evolution with redshift
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks, zmin=4, zmax=5, label="4-5", color="brown", 
-        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
-        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
-    np.savetxt(
-        os.path.join(subdir, "cddf_parks_z45.txt"), (l_N, cddf))
+        dla_parks,
+        zmin=4,
+        zmax=5,
+        label="4-5",
+        color="brown",
+        p_thresh=p_thresh,
+        snr_thresh=snr_thresh,
+        apply_p_dlas=False,
+        prior=False,
+        lyb=lyb,
+        search_range_from_ours=search_range_from_ours,
+    )
+    np.savetxt(os.path.join(subdir, "cddf_parks_z45.txt"), (l_N, cddf))
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks, zmin=3, zmax=4, label="3-4", color="black", 
-        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
-        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
-    np.savetxt(
-        os.path.join(subdir, "cddf_parks_z34.txt"), (l_N, cddf))
+        dla_parks,
+        zmin=3,
+        zmax=4,
+        label="3-4",
+        color="black",
+        p_thresh=p_thresh,
+        snr_thresh=snr_thresh,
+        apply_p_dlas=False,
+        prior=False,
+        lyb=lyb,
+        search_range_from_ours=search_range_from_ours,
+    )
+    np.savetxt(os.path.join(subdir, "cddf_parks_z34.txt"), (l_N, cddf))
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks, zmin=2.5, zmax=3, label="2.5-3", color="green", 
-        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
-        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
-    np.savetxt(
-        os.path.join(subdir, "cddf_parks_z253.txt"), (l_N, cddf))
+        dla_parks,
+        zmin=2.5,
+        zmax=3,
+        label="2.5-3",
+        color="green",
+        p_thresh=p_thresh,
+        snr_thresh=snr_thresh,
+        apply_p_dlas=False,
+        prior=False,
+        lyb=lyb,
+        search_range_from_ours=search_range_from_ours,
+    )
+    np.savetxt(os.path.join(subdir, "cddf_parks_z253.txt"), (l_N, cddf))
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks, zmin=2, zmax=2.5, label="2-2.5", color="blue", 
-        p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
-        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
-    np.savetxt(
-        os.path.join(subdir, "cddf_parks_z225.txt"), (l_N, cddf))
+        dla_parks,
+        zmin=2,
+        zmax=2.5,
+        label="2-2.5",
+        color="blue",
+        p_thresh=p_thresh,
+        snr_thresh=snr_thresh,
+        apply_p_dlas=False,
+        prior=False,
+        lyb=lyb,
+        search_range_from_ours=search_range_from_ours,
+    )
+    np.savetxt(os.path.join(subdir, "cddf_parks_z225.txt"), (l_N, cddf))
 
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
@@ -485,19 +620,35 @@ def do_Parks_CDDF(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/D
     save_figure(os.path.join(subdir, "cddf_zz_parks"))
     plt.clf()
 
-def do_Parks_dNdX(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, snr_thresh: float = -2.0, lyb: bool = False, search_range_from_ours: bool = False):
-    '''
+
+def do_Parks_dNdX(
+    qsos: QSOLoaderDR16Q,
+    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
+    p_thresh: float = 0.98,
+    snr_thresh: float = -2.0,
+    lyb: bool = False,
+    search_range_from_ours: bool = False,
+):
+    """
     Plot dNdX for Parks' CNN model in the DR16Q
 
     Parameters:
     ----
     dla_parks (str) : path to Parks' CNN model in the DR16Q
-    '''
+    """
     dla_data.dndx_not()
     dla_data.dndx_pro()
     z_cent, dNdX = qsos.plot_line_density_park(
-        dla_parks, zmax=5, p_thresh=p_thresh, snr_thresh=snr_thresh, apply_p_dlas=False,
-        prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+        dla_parks,
+        zmax=5,
+        p_thresh=p_thresh,
+        snr_thresh=snr_thresh,
+        apply_p_dlas=False,
+        prior=False,
+        lyb=lyb,
+        search_range_from_ours=search_range_from_ours,
+    )
     np.savetxt(os.path.join(subdir, "dndx_all.txt"), (z_cent, dNdX))
 
     plt.legend(loc=0)
@@ -505,68 +656,121 @@ def do_Parks_dNdX(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/D
     save_figure(os.path.join(subdir, "dndx_parks"))
     plt.clf()
 
-def do_Parks_OmegaDLA(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", zmin: float = 2.0, zmax: float = 4.0, p_thresh: float = 0.98, snr_thresh: float = -2.0, lyb: bool = False, search_range_from_ours: bool = False):
+
+def do_Parks_OmegaDLA(
+    qsos: QSOLoaderDR16Q,
+    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
+    zmin: float = 2.0,
+    zmax: float = 4.0,
+    p_thresh: float = 0.98,
+    snr_thresh: float = -2.0,
+    lyb: bool = False,
+    search_range_from_ours: bool = False,
+):
     """
     Plot OmegaDLA for Parks's CNN model in DR16Q
     """
-    #Omega_DLA
+    # Omega_DLA
     dla_data.omegahi_not()
     dla_data.omegahi_pro()
     dla_data.crighton_omega()
 
-    (z_cent, omega_dla) = qsos.plot_omega_dla_parks(dla_parks, zmin=zmin, zmax=zmax, p_thresh=p_thresh, snr_thresh=snr_thresh, lyb=lyb, search_range_from_ours=search_range_from_ours)
+    (z_cent, omega_dla) = qsos.plot_omega_dla_parks(
+        dla_parks,
+        zmin=zmin,
+        zmax=zmax,
+        p_thresh=p_thresh,
+        snr_thresh=snr_thresh,
+        lyb=lyb,
+        search_range_from_ours=search_range_from_ours,
+    )
 
-    np.savetxt(os.path.join(subdir,"omega_dla_all.txt"), (z_cent, omega_dla))
+    np.savetxt(os.path.join(subdir, "omega_dla_all.txt"), (z_cent, omega_dla))
     plt.legend(loc=0)
     plt.xlim(2, 5)
     plt.ylim(0, 2.5)
-    save_figure(os.path.join(subdir,"omega_parks"))
+    save_figure(os.path.join(subdir, "omega_parks"))
     plt.clf()
 
-def do_Parks_snr_check(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", subdir: str = "CDDF_analysis/parks_cddf_dr16q/", p_thresh:float = 0.98, lyb: bool = False, search_range_from_ours: bool = False):
-    '''
+
+def do_Parks_snr_check(
+    qsos: QSOLoaderDR16Q,
+    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
+    p_thresh: float = 0.98,
+    lyb: bool = False,
+    search_range_from_ours: bool = False,
+):
+    """
     Check effect of removing spectra with low SNRs.
-    '''
+    """
     snrs_list = (-2, 2, 4, 8)
 
     # CDDF
     dla_data.noterdaeme_12_data()
-    for i,snr_thresh in enumerate(snrs_list):
+    for i, snr_thresh in enumerate(snrs_list):
         (l_N, cddf) = qsos.plot_cddf_parks(
-            dla_parks, zmax=5, p_thresh=p_thresh, color=cmap( (i + 1)  / len(snrs_list)),
-            snr_thresh=snr_thresh, label="Parks SNR > {:d}".format(snr_thresh), 
+            dla_parks,
+            zmax=5,
+            p_thresh=p_thresh,
+            color=cmap((i + 1) / len(snrs_list)),
+            snr_thresh=snr_thresh,
+            label="Parks SNR > {:d}".format(snr_thresh),
             apply_p_dlas=False,
-            prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+            prior=False,
+            lyb=lyb,
+            search_range_from_ours=search_range_from_ours,
+        )
 
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
     save_figure(os.path.join(subdir, "cddf_parks_snr"))
     plt.clf()
-    
+
     # dN/dX
     dla_data.dndx_not()
     dla_data.dndx_pro()
-    for i,snr_thresh in enumerate(snrs_list):
+    for i, snr_thresh in enumerate(snrs_list):
         z_cent, dNdX = qsos.plot_line_density_park(
-            dla_parks, zmax=5, p_thresh=p_thresh, color=cmap( (i + 1)  / len(snrs_list)),
-            snr_thresh=snr_thresh, label="Parks SNR > {:d}".format(snr_thresh), 
+            dla_parks,
+            zmax=5,
+            p_thresh=p_thresh,
+            color=cmap((i + 1) / len(snrs_list)),
+            snr_thresh=snr_thresh,
+            label="Parks SNR > {:d}".format(snr_thresh),
             apply_p_dlas=False,
-            prior=False, lyb=lyb, search_range_from_ours=search_range_from_ours)
+            prior=False,
+            lyb=lyb,
+            search_range_from_ours=search_range_from_ours,
+        )
 
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
     save_figure(os.path.join(subdir, "dndx_parks_snr"))
     plt.clf()
 
-def do_confusion_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", snr: float = -1.0, dla_confidence: float = 0.98, p_thresh: float = 0.98, lyb: bool = True):
-    '''
-    plot the multi-DLA confusion matrix between our MAP predictions and Parks' predictions 
-    '''
-    if 'dla_catalog_parks' not in dir(qsos):
-        qsos.load_dla_parks(dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1)
 
-    confusion_matrix,_ = qsos.make_multi_confusion(qsos.dla_catalog_parks, dla_confidence, p_thresh, snr=snr, lyb=lyb)
+def do_confusion_parks(
+    qsos: QSOLoaderDR16Q,
+    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    snr: float = -1.0,
+    dla_confidence: float = 0.98,
+    p_thresh: float = 0.98,
+    lyb: bool = True,
+):
+    """
+    plot the multi-DLA confusion matrix between our MAP predictions and Parks' predictions
+    """
+    if "dla_catalog_parks" not in dir(qsos):
+        qsos.load_dla_parks(
+            dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1
+        )
+
+    confusion_matrix, _ = qsos.make_multi_confusion(
+        qsos.dla_catalog_parks, dla_confidence, p_thresh, snr=snr, lyb=lyb
+    )
 
     size, _ = confusion_matrix.shape
 
@@ -575,93 +779,165 @@ def do_confusion_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfi
     for i in range(size):
         print("{} DLA".format(i), end="\t")
         for j in range(size):
-            print("{}".format(confusion_matrix[i,j]), end=" ")   
+            print("{}".format(confusion_matrix[i, j]), end=" ")
         print("")
 
     print("Mutli-DLA disagreements : ")
     print("----")
     for i in range(size):
-        num = confusion_matrix[(i+1):, 0:(i+1)].sum() + confusion_matrix[0:(i+1), (i+1):].sum()
-        print("Error between >= {} DLAs and < {} DLAs: {:.2g}".format(i + 1, i + 1, num / confusion_matrix.sum()))
+        num = (
+            confusion_matrix[(i + 1) :, 0 : (i + 1)].sum()
+            + confusion_matrix[0 : (i + 1), (i + 1) :].sum()
+        )
+        print(
+            "Error between >= {} DLAs and < {} DLAs: {:.2g}".format(
+                i + 1, i + 1, num / confusion_matrix.sum()
+            )
+        )
 
-def do_MAP_parks_comparison(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", dla_confidence: float = 0.98, num_dlas: int = 1, num_bins: int = 100):
-    '''
+
+def do_MAP_parks_comparison(
+    qsos: QSOLoaderDR16Q,
+    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    dla_confidence: float = 0.98,
+    num_dlas: int = 1,
+    num_bins: int = 100,
+):
+    """
     Plot the comparisons between MAP values and Parks' predictions
-    '''
-    if 'dla_catalog_parks' not in dir(qsos):
-        qsos.load_dla_parks(dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1)
+    """
+    if "dla_catalog_parks" not in dir(qsos):
+        qsos.load_dla_parks(
+            dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1
+        )
 
     Delta_z_dlas, Delta_log_nhis, z_dlas_parks = qsos.make_MAP_parks_comparison(
-        qsos.dla_catalog_parks, num_dlas=num_dlas, dla_confidence=dla_confidence)
+        qsos.dla_catalog_parks, num_dlas=num_dlas, dla_confidence=dla_confidence
+    )
 
     fig, axs = plt.subplots(1, 2, figsize=(16, 5))
     # plot in the same scale as in the Garnett (2017) paper
     # for z_dlas, xlim(-0.01, 0.01); for log_nhis, xlim(-1, 1)
     # TODO: make KDE plot
-    axs[0].hist(Delta_z_dlas.ravel(), 
-        bins=np.linspace(-0.01, 0.01, num_bins), density=True)
+    axs[0].hist(
+        Delta_z_dlas.ravel(), bins=np.linspace(-0.01, 0.01, num_bins), density=True
+    )
     axs[0].set_xlim(-0.01, 0.01)
-    axs[0].set_xlabel(r'difference between $z_{DLA}$ (new code/Parks);'+' DLA({})'.format(num_dlas))
-    axs[0].set_ylabel(r'$p$(difference)')
+    axs[0].set_xlabel(
+        r"difference between $z_{DLA}$ (new code/Parks);" + " DLA({})".format(num_dlas)
+    )
+    axs[0].set_ylabel(r"$p$(difference)")
 
-    axs[1].hist(Delta_log_nhis.ravel(), 
-        bins=np.linspace(-1, 1, num_bins), density=True)
+    axs[1].hist(Delta_log_nhis.ravel(), bins=np.linspace(-1, 1, num_bins), density=True)
     axs[1].set_xlim(-1, 1)
-    axs[1].set_xlabel(r'difference between $\log{N_{HI}}$ (new code/Parks);'+' DLA({})'.format(num_dlas))
-    axs[1].set_ylabel(r'$p$(difference)')
+    axs[1].set_xlabel(
+        r"difference between $\log{N_{HI}}$ (new code/Parks);"
+        + " DLA({})".format(num_dlas)
+    )
+    axs[1].set_ylabel(r"$p$(difference)")
 
     plt.tight_layout()
-    save_figure('MAP_comparison_Parks_dlas{}_confidence{}'.format(num_dlas, str(dla_confidence).replace(".","_")))
+    save_figure(
+        "MAP_comparison_Parks_dlas{}_confidence{}".format(
+            num_dlas, str(dla_confidence).replace(".", "_")
+        )
+    )
     plt.clf()
-    plt.close()   
+    plt.close()
 
-    high_z = np.array([2.5,3.0,3.5,5.0])
-    low_z = np.array([2.0,2.5,3.0,3.5])
-    log_nhi_evo = []; sterr_log_nhi_evo = []
-    z_dla_evo   = []; sterr_z_dla_evo   =  []
+    high_z = np.array([2.5, 3.0, 3.5, 5.0])
+    low_z = np.array([2.0, 2.5, 3.0, 3.5])
+    log_nhi_evo = []
+    sterr_log_nhi_evo = []
+    z_dla_evo = []
+    sterr_z_dla_evo = []
     for high_z_dla, low_z_dla in zip(high_z, low_z):
         inds = (z_dlas_parks > low_z_dla) & (z_dlas_parks < high_z_dla)
 
-        z_dla_evo.append( np.nanmean( Delta_z_dlas[inds] ) )
-        log_nhi_evo.append( np.nanmean( Delta_log_nhis[inds] ) )
+        z_dla_evo.append(np.nanmean(Delta_z_dlas[inds]))
+        log_nhi_evo.append(np.nanmean(Delta_log_nhis[inds]))
 
         # stderr = sqrt(s / n)
-        sterr_z_dla_evo.append( 
-            np.sqrt( np.nansum((Delta_z_dlas[inds] - np.nanmean(Delta_z_dlas[inds]))**2 ) / (Delta_z_dlas[inds].shape[0] - 1)) 
-            / np.sqrt(Delta_z_dlas[inds].shape[0]) )
+        sterr_z_dla_evo.append(
+            np.sqrt(
+                np.nansum((Delta_z_dlas[inds] - np.nanmean(Delta_z_dlas[inds])) ** 2)
+                / (Delta_z_dlas[inds].shape[0] - 1)
+            )
+            / np.sqrt(Delta_z_dlas[inds].shape[0])
+        )
 
-        sterr_log_nhi_evo.append( 
-            np.sqrt( np.nansum( (Delta_log_nhis[inds] - np.nanmean(Delta_log_nhis[inds]))**2 ) / (Delta_log_nhis[inds].shape[0] - 1)) 
-            / np.sqrt(Delta_log_nhis[inds].shape[0]) )
+        sterr_log_nhi_evo.append(
+            np.sqrt(
+                np.nansum(
+                    (Delta_log_nhis[inds] - np.nanmean(Delta_log_nhis[inds])) ** 2
+                )
+                / (Delta_log_nhis[inds].shape[0] - 1)
+            )
+            / np.sqrt(Delta_log_nhis[inds].shape[0])
+        )
 
-    z_cent = np.array( [(z_x + z_m) / 2. for (z_m, z_x) in zip(high_z, low_z)] )
-    xerrs  = (z_cent - low_z, high_z - z_cent)
+    z_cent = np.array([(z_x + z_m) / 2.0 for (z_m, z_x) in zip(high_z, low_z)])
+    xerrs = (z_cent - low_z, high_z - z_cent)
 
-    plt.errorbar(z_cent, z_dla_evo, yerr=sterr_z_dla_evo, xerr=xerrs, 
-        label=r"$z_{{DLA}} - z_{{DLA}}^{{Parks}} \mid \mathrm{{Garnett}}({k}) \cap \mathrm{{Parks}}({k})$".format(k=num_dlas))
+    plt.errorbar(
+        z_cent,
+        z_dla_evo,
+        yerr=sterr_z_dla_evo,
+        xerr=xerrs,
+        label=r"$z_{{DLA}} - z_{{DLA}}^{{Parks}} \mid \mathrm{{Garnett}}({k}) \cap \mathrm{{Parks}}({k})$".format(
+            k=num_dlas
+        ),
+    )
     plt.xlabel(r"$z_{DLA}^{Parks}$")
     plt.ylabel(r"$\Delta z_{DLA}$")
     plt.legend(loc=0)
     save_figure("MAP_z_dla_evolution_parks")
     plt.clf()
 
-    plt.errorbar(z_cent, log_nhi_evo, yerr=sterr_log_nhi_evo, xerr=xerrs, 
-        label=r"$\log{{N_{{HI}}}}_{{DLA}} - \log{{N_{{HI}}}}_{{DLA}}^{{Parks}} \mid \mathrm{{Garnett}}({k}) \cap \mathrm{{Parks}}({k})$".format(k=num_dlas))
+    plt.errorbar(
+        z_cent,
+        log_nhi_evo,
+        yerr=sterr_log_nhi_evo,
+        xerr=xerrs,
+        label=r"$\log{{N_{{HI}}}}_{{DLA}} - \log{{N_{{HI}}}}_{{DLA}}^{{Parks}} \mid \mathrm{{Garnett}}({k}) \cap \mathrm{{Parks}}({k})$".format(
+            k=num_dlas
+        ),
+    )
     plt.xlabel(r"$z_{DLA}^{Parks}$")
     plt.ylabel(r"$\Delta \log{N_{HI}}$")
     plt.legend(loc=0)
     save_figure("MAP_log_nhi_evolution_parks")
     plt.clf()
 
-def do_MAP_hist2d_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits", dla_confidence: float = 0.98, num_dlas: int = 1):
-    '''
-    Do the hist2d in between z_true vs z_map
-    '''
-    if 'dla_catalog_parks' not in dir(qsos):
-        qsos.load_dla_parks(dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1)
 
-    _, _, _, gp_z_dlas, gp_log_nhis, cnn_z_dlas, cnn_log_nhis = qsos.make_MAP_parks_comparison(
-        qsos.dla_catalog_parks, num_dlas=num_dlas, dla_confidence=dla_confidence, return_map_values=True)
+def do_MAP_hist2d_parks(
+    qsos: QSOLoaderDR16Q,
+    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    dla_confidence: float = 0.98,
+    num_dlas: int = 1,
+):
+    """
+    Do the hist2d in between z_true vs z_map
+    """
+    if "dla_catalog_parks" not in dir(qsos):
+        qsos.load_dla_parks(
+            dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1
+        )
+
+    (
+        _,
+        _,
+        _,
+        gp_z_dlas,
+        gp_log_nhis,
+        cnn_z_dlas,
+        cnn_log_nhis,
+    ) = qsos.make_MAP_parks_comparison(
+        qsos.dla_catalog_parks,
+        num_dlas=num_dlas,
+        dla_confidence=dla_confidence,
+        return_map_values=True,
+    )
 
     # expand the arrays
     gp_z_dlas = gp_z_dlas.ravel()
@@ -670,8 +946,9 @@ def do_MAP_hist2d_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distf
     cnn_log_nhis = cnn_log_nhis.ravel()
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
-    (h1, x1edges, y1edges, im1) = ax1.hist2d(gp_z_dlas, cnn_z_dlas,
-        bins = int(np.sqrt(gp_z_dlas.shape[0])), cmap='viridis')
+    (h1, x1edges, y1edges, im1) = ax1.hist2d(
+        gp_z_dlas, cnn_z_dlas, bins=int(np.sqrt(gp_z_dlas.shape[0])), cmap="viridis"
+    )
     # a perfect prediction straight line
     z_dlas_plot = np.linspace(2.0, 5.0, 100)
     ax1.plot(z_dlas_plot, z_dlas_plot)
@@ -679,8 +956,12 @@ def do_MAP_hist2d_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distf
     ax1.set_ylabel(r"$z_{{DLA,CNN}}$")
     fig.colorbar(im1, ax=ax1)
 
-    (h2, x2edges, y2edges, im2) = ax2.hist2d(gp_log_nhis, cnn_log_nhis,
-        bins = int(np.sqrt(gp_log_nhis.shape[0])), cmap='viridis')
+    (h2, x2edges, y2edges, im2) = ax2.hist2d(
+        gp_log_nhis,
+        cnn_log_nhis,
+        bins=int(np.sqrt(gp_log_nhis.shape[0])),
+        cmap="viridis",
+    )
 
     # a perfect prediction straight line
     log_nhi_plot = np.linspace(20, 22.5, 100)
@@ -696,20 +977,27 @@ def do_MAP_hist2d_parks(qsos: QSOLoaderDR16Q, dla_parks: str = "data/dr16q/distf
     # ax2.set_ylim(20, 22.5)
     fig.colorbar(im2, ax=ax2)
 
-    print("Pearson Correlation for (map_z_dlas,   cnn_z_dlas) : ",
-        pearsonr(gp_z_dlas, cnn_z_dlas))
-    print("Pearson Correlation for (map_log_nhis, cnn_log_nhis) : ",
-        pearsonr(gp_log_nhis, cnn_log_nhis))
+    print(
+        "Pearson Correlation for (map_z_dlas,   cnn_z_dlas) : ",
+        pearsonr(gp_z_dlas, cnn_z_dlas),
+    )
+    print(
+        "Pearson Correlation for (map_log_nhis, cnn_log_nhis) : ",
+        pearsonr(gp_log_nhis, cnn_log_nhis),
+    )
 
     # examine the pearson correlation per log nhi bins
     log_nhi_bins = [20, 20.5, 21, 23]
 
     for (min_log_nhi, max_log_nhi) in zip(log_nhi_bins[:-1], log_nhi_bins[1:]):
-        ind  =  (gp_log_nhis > min_log_nhi) & (gp_log_nhis < max_log_nhi)
+        ind = (gp_log_nhis > min_log_nhi) & (gp_log_nhis < max_log_nhi)
         ind = ind & (cnn_log_nhis > min_log_nhi) & (cnn_log_nhis < max_log_nhi)
-        
-        print("Map logNHI Bin [{}, {}] Pearson Correlation for (map_log_nhis, true_log_nhi) : ".format(
-            min_log_nhi, max_log_nhi),
-            pearsonr(gp_log_nhis[ind], cnn_log_nhis[ind]))
+
+        print(
+            "Map logNHI Bin [{}, {}] Pearson Correlation for (map_log_nhis, true_log_nhi) : ".format(
+                min_log_nhi, max_log_nhi
+            ),
+            pearsonr(gp_log_nhis[ind], cnn_log_nhis[ind]),
+        )
 
     save_figure("MAP_hist2d_GP_CNN")
