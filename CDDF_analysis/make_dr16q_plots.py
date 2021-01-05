@@ -187,6 +187,10 @@ def do_cddf_occams(
     subdir: str = "CDDF_analysis",
     subdir_occams_upper: str = "CDDF_analysis",
     subdir_occams_lower: str = "CDDF_analysis",
+    label_upper: str = "GP Occams upper",
+    label_lower: str = "GP Occams lower",
+    outfile: str = "cddf_gp_occams",
+    plot_gp: bool = True, 
 ):
     """
     Make CDDF plots with systematics from Occams razors.
@@ -194,14 +198,15 @@ def do_cddf_occams(
     dla_data.noterdaeme_12_data()
 
     # (l_N, cddf, cddf68[:,0], cddf68[:,1], cddf95[:,0],cddf95[:,1]) in (6, N) shape
-    cddf_all = np.loadtxt(os.path.join(subdir, "cddf_all.txt"))
-    (_, N) = cddf_all.shape
+    if plot_gp:
+        cddf_all = np.loadtxt(os.path.join(subdir, "cddf_all.txt"))
+        (_, N) = cddf_all.shape
 
-    cddf68 = np.full((N, 2), fill_value=np.nan)
-    cddf95 = np.full((N, 2), fill_value=np.nan)
-    (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
+        cddf68 = np.full((N, 2), fill_value=np.nan)
+        cddf95 = np.full((N, 2), fill_value=np.nan)
+        (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
-    plot_cddf(l_N, cddf, cddf68, cddf95)
+        plot_cddf(l_N, cddf, cddf68, cddf95)
 
     # Occams lower and upper
     cddf_all = np.loadtxt(os.path.join(subdir_occams_upper, "cddf_all.txt"))
@@ -211,7 +216,7 @@ def do_cddf_occams(
     cddf95 = np.full((N, 2), fill_value=np.nan)
     (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
-    plot_cddf(l_N, cddf, cddf68, cddf95, label="GP Occams upper", color="C1")
+    plot_cddf(l_N, cddf, cddf68, cddf95, label=label_upper, color="C1")
 
     # lower
     cddf_all = np.loadtxt(os.path.join(subdir_occams_lower, "cddf_all.txt"))
@@ -221,12 +226,12 @@ def do_cddf_occams(
     cddf95 = np.full((N, 2), fill_value=np.nan)
     (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
-    plot_cddf(l_N, cddf, cddf68, cddf95, label="GP Occams lower", color="C2")
+    plot_cddf(l_N, cddf, cddf68, cddf95, label=label_lower, color="C2")
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
     plt.tight_layout()
-    save_figure(os.path.join(subdir, "cddf_gp_occams"))
+    save_figure(os.path.join(subdir, outfile))
     plt.clf()
 
 
@@ -290,6 +295,10 @@ def do_dndx_occams(
     subdir: str = "CDDF_analysis",
     subdir_occams_upper: str = "CDDF_analysis",
     subdir_occams_lower: str = "CDDF_analysis",
+    label_upper: str = "GP Occams upper",
+    label_lower: str = "GP Occams lower",
+    outfile: str = "dndx_gp_occams",
+    plot_gp: bool = True, 
 ):
     """
     Make dNdX plots with systematics from Occams razors.
@@ -298,14 +307,15 @@ def do_dndx_occams(
     dla_data.dndx_pro()
 
     # (z_cent, dNdX, dndx68[:,0],dndx68[:,1], dndx95[:,0],dndx95[:,1]) in (6, N) shape
-    dndx_all = np.loadtxt(os.path.join(subdir, "dndx_all.txt"))
-    (_, N) = dndx_all.shape
+    if plot_gp:
+        dndx_all = np.loadtxt(os.path.join(subdir, "dndx_all.txt"))
+        (_, N) = dndx_all.shape
 
-    dndx68 = np.full((N, 2), fill_value=np.nan)
-    dndx95 = np.full((N, 2), fill_value=np.nan)
-    (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
+        dndx68 = np.full((N, 2), fill_value=np.nan)
+        dndx95 = np.full((N, 2), fill_value=np.nan)
+        (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
-    plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C0")
+        plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C0")
 
     # Occams Upper
     dndx_all = np.loadtxt(os.path.join(subdir_occams_upper, "dndx_all.txt"))
@@ -315,7 +325,7 @@ def do_dndx_occams(
     dndx95 = np.full((N, 2), fill_value=np.nan)
     (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
-    plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C1", label="GP Occams upper")
+    plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C1", label=label_upper)
 
     # Occams Lower
     dndx_all = np.loadtxt(os.path.join(subdir_occams_lower, "dndx_all.txt"))
@@ -325,11 +335,11 @@ def do_dndx_occams(
     dndx95 = np.full((N, 2), fill_value=np.nan)
     (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
-    plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C2", label="GP Occams lower")
+    plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C2", label=label_lower)
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
     plt.tight_layout()
-    save_figure(os.path.join(subdir, "dndx_occams"))
+    save_figure(os.path.join(subdir, outfile))
     plt.clf()
 
 
@@ -365,6 +375,10 @@ def do_omega_dla_occams(
     subdir: str = "CDDF_analysis",
     subdir_occams_upper: str = "CDDF_analysis",
     subdir_occams_lower: str = "CDDF_analysis",
+    label_upper: str = "GP Occams upper",
+    label_lower: str = "GP Occams lower",
+    outfile: str = "omega_occams",
+    plot_gp: bool = True, 
 ):
     """
     Make OmegaDLA plots with systematics from Occams razors.
@@ -374,21 +388,22 @@ def do_omega_dla_occams(
     dla_data.crighton_omega()
 
     # (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) in (6, N) shape
-    omega_dla_all = np.loadtxt(os.path.join(subdir, "omega_dla_all.txt"))
-    (_, N) = omega_dla_all.shape
+    if plot_gp:
+        omega_dla_all = np.loadtxt(os.path.join(subdir, "omega_dla_all.txt"))
+        (_, N) = omega_dla_all.shape
 
-    omega_dla_68 = np.full((N, 2), fill_value=np.nan)
-    omega_dla_95 = np.full((N, 2), fill_value=np.nan)
-    (
-        z_cent,
-        omega_dla,
-        omega_dla_68[:, 0],
-        omega_dla_68[:, 1],
-        omega_dla_95[:, 0],
-        omega_dla_95[:, 1],
-    ) = omega_dla_all
+        omega_dla_68 = np.full((N, 2), fill_value=np.nan)
+        omega_dla_95 = np.full((N, 2), fill_value=np.nan)
+        (
+            z_cent,
+            omega_dla,
+            omega_dla_68[:, 0],
+            omega_dla_68[:, 1],
+            omega_dla_95[:, 0],
+            omega_dla_95[:, 1],
+        ) = omega_dla_all
 
-    plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C0")
+        plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C0")
 
     # Occams upper
     omega_dla_all = np.loadtxt(os.path.join(subdir_occams_upper, "omega_dla_all.txt"))
@@ -411,7 +426,7 @@ def do_omega_dla_occams(
         omega_dla_68,
         omega_dla_95,
         color="C1",
-        label="GP Occams upper",
+        label=label_upper,
     )
 
     # Occams lower
@@ -435,14 +450,14 @@ def do_omega_dla_occams(
         omega_dla_68,
         omega_dla_95,
         color="C2",
-        label="GP Occams lower",
+        label=label_lower,
     )
 
     plt.legend(loc=0)
     plt.xlim(2, 5)
     plt.ylim(0, 2.5)
     plt.tight_layout()
-    save_figure(os.path.join(subdir, "omega_occams"))
+    save_figure(os.path.join(subdir, outfile))
     plt.clf()
 
 
@@ -510,8 +525,8 @@ def plot_omega_dla(
             alpha=0.5,
         )
     yerr = (
-        omega_dla - omega_dla_68[:, 0],
-        omega_dla_68[:, 1] - omega_dla,
+        omega_dla - 1000 * omega_dla_68[:, 0],
+        1000 * omega_dla_68[:, 1] - omega_dla,
     )
     plt.errorbar(
         z_cent, omega_dla, yerr=yerr, xerr=xerrs, fmt="s", label=label, color=color
