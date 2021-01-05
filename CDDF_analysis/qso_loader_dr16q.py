@@ -13,8 +13,9 @@ import h5py
 from astropy.io import fits
 
 from .set_parameters import *
-from .qso_loader import QSOLoader, GPLoader
-
+from .qso_loader import QSOLoader, GPLoader, conditional_mvnpdf_low_rank, make_fig
+from .voigt import Voigt_absorption
+from .effective_optical_depth import effective_optical_depth
 
 class QSOLoaderDR16Q(QSOLoader):
     def __init__(
@@ -50,11 +51,16 @@ class QSOLoaderDR16Q(QSOLoader):
             occams_razor=occams_razor,
         )
 
-        # read the meanflux suppression samples
+        # [meanflux] read the meanflux suppression samples
         self.tau_sample_file = h5py.File(tau_sample_file, "r")
 
         self.tau_0_samples = self.tau_sample_file["tau_0_samples"][:, 0]
         self.beta_samples = self.tau_sample_file["beta_samples"][:, 0]
+
+        # read the DLA parameter samples
+        self.sample_file = h5py.File(sample_file, "r")
+
+        self.log_nhi_samples = self.sample_file["log_nhi_samples"][:, 0]
 
         # read the DR16Q catalogue file
         self.dist_file = dist_file
@@ -76,8 +82,6 @@ class QSOLoaderDR16Q(QSOLoader):
         """
         Load GP processed file and catalog based on the self.condition
         """
-        self.condition
-
         # test_set prior inds : organise arrays into the same order using selected test_inds
         # self.test_ind = self.processed_file['test_ind'][0, :].astype(np.bool) #size: (num_qsos, )
         # Assume you already have test_ind in the self
@@ -240,6 +244,11 @@ class QSOLoaderDR16Q(QSOLoader):
         self.dla_map_num_dla = self.dla_map_num_dla[self.condition]
         self.model_posteriors_dla = self.model_posteriors_dla.T[self.condition].T
         self.multi_p_no_dlas = self.multi_p_no_dlas.T[self.condition].T
+        # [map] reprepare the MAP values after filtering
+        self.prepare_map_vals()
+        # [test_real_index] update this array to be test_ind[condition]
+        # since find_this_flux is using this array
+        self.test_real_index = self.test_real_index[self.condition]
 
     def eBOSS_cut(
         self,
@@ -621,17 +630,17 @@ class QSOLoaderDR16Q(QSOLoader):
 
     def plot_this_mu(
         self,
-        nspec,
-        suppressed=True,
-        num_voigt_lines=3,
-        num_forest_lines=31,
-        Parks=False,
-        dla_parks=None,
-        label="",
-        new_fig=True,
-        color="red",
+        nspec: int,
+        suppressed: bool = True,
+        num_voigt_lines: int = 3,
+        num_forest_lines: int = 31,
+        Parks: bool = False,
+        label:str = "",
+        new_fig: bool = True,
+        color: str = "red",
         conditional_gp: bool = False,
         color_cond: str = "lightblue",
+        nth=None,
     ):
         """
         Plot the spectrum with the dla model
@@ -652,7 +661,211 @@ class QSOLoaderDR16Q(QSOLoader):
         map_z_dlas : MAP z_dla values
         map_log_nhis : MAP log NHI values
         """
-        NotImplementedError
+        # spec id
+        plate, mjd, fiber_id = (
+            self.plates[nspec],
+            self.mjds[nspec],
+            self.fiber_ids[nspec],
+        )
+
+        # for obs data
+        this_wavelengths = self.find_this_wavelengths(nspec)
+        this_flux = self.find_this_flux(nspec)
+        this_noise_variance = self.find_this_noise_variance(nspec)
+        this_pixel_mask = self.find_this_pixel_mask(nspec)
+
+        this_rest_wavelengths = emitted_wavelengths(
+            this_wavelengths, self.z_qsos[nspec]
+        )
+
+        # [meanflux] re-assign the map of meanflux tau and beta
+        self.GP.tau_0_kim = 0.00554
+        self.GP.beta_kim = 3.182
+        # [building GP model] interpolating onto the spectrum
+        self.GP.set_data(
+            this_rest_wavelengths,
+            this_flux,
+            this_noise_variance,
+            this_pixel_mask,
+            self.z_qsos[nspec],
+            build_model=True,
+        )
+        self.GP.num_forest_lines = num_forest_lines
+
+        rest_wavelengths = self.GP.x
+        this_mu_original = self.GP.this_mu
+
+        # get the MAP DLA values
+        if nth == None:
+            nth = np.argmax(self.model_posteriors[nspec]) - 1 - self.sub_dla
+        # [yes DLAs] find maps of DLAs and multiply onto the GP mean
+        if nth >= 0:
+            map_z_dlas = self.all_z_dlas[nspec, : (nth + 1)]
+            map_log_nhis = self.all_log_nhis[nspec, : (nth + 1)]
+            assert np.all(~np.isnan(map_z_dlas))
+
+            # [meanflux] find the map of meanflux tau and beta
+            map_tau_0, map_beta = self.find_meanflux_map_from_dla_map(nspec)
+            print("[Info] map_tau_0 = {:.4g}, map_beta = {:.4g}".format(map_tau_0, map_beta))
+            # [meanflux] re-assign the map of meanflux tau and beta
+            self.GP.tau_0_kim = map_tau_0
+            self.GP.beta_kim = map_beta
+            # [building GP model] interpolating onto the spectrum
+            self.GP.set_data(
+                this_rest_wavelengths,
+                this_flux,
+                this_noise_variance,
+                this_pixel_mask,
+                self.z_qsos[nspec],
+                build_model=True,
+            )
+            this_mu = self.GP.this_mu
+
+            for map_z_dla, map_log_nhi in zip(map_z_dlas, map_log_nhis):
+                absorption = Voigt_absorption(
+                    rest_wavelengths * (1 + self.z_qsos[nspec]),
+                    10 ** map_log_nhi,
+                    map_z_dla,
+                    num_lines=num_voigt_lines,
+                )
+
+                this_mu = this_mu * absorption
+
+        # [no DLA] find map of meanflux and apply on the GP mean
+        elif nth < 0:
+            print("[Info] no map values stored currently for null model ...")
+            this_mu = self.GP.this_mu
+
+        # get parks model
+        if Parks:
+            if not "dict_parks" in dir(self):
+                self.dict_parks = self.prediction_parks2dict(self.dist_file, self.thing_ids)
+
+            dict_parks = self.dict_parks
+
+            # construct an array of unique ids for los
+            self.unique_ids = self.make_unique_id(
+                self.plates, self.mjds, self.fiber_ids
+            )
+            unique_ids = self.make_unique_id(
+                dict_parks["plates"], dict_parks["mjds"], dict_parks["fiber_ids"]
+            )
+            assert unique_ids.dtype is np.dtype("int64")
+            assert self.unique_ids.dtype is np.dtype("int64")
+
+            uids = np.where(unique_ids == self.unique_ids[nspec])[0]
+
+            this_parks_mu = this_mu_original
+            dla_confidences = []
+            z_dlas = []
+            log_nhis = []
+
+            for uid in uids:
+                z_dla = dict_parks["z_dlas"][uid]
+                log_nhi = dict_parks["log_nhis"][uid]
+
+                dla_confidences.append(dict_parks["dla_confidences"][uid])
+                z_dlas.append(z_dla)
+                log_nhis.append(log_nhi)
+
+                absorption = Voigt_absorption(
+                    rest_wavelengths * (1 + self.z_qsos[nspec]),
+                    10 ** log_nhi,
+                    z_dla,
+                    num_lines=1,
+                )
+
+                this_parks_mu = this_parks_mu * absorption
+
+        # plt.figure(figsize=(16, 5))
+        if new_fig:
+            make_fig()
+            plt.plot(
+                this_rest_wavelengths,
+                this_flux,
+                label="observed flux; spec-{}-{}-{}".format(plate, mjd, fiber_id),
+                color="C0",
+            )
+
+        if Parks:
+            plt.plot(
+                rest_wavelengths,
+                this_parks_mu,
+                label=r"CNN: z_dlas = ({}); lognhis=({}); p_dlas=({})".format(
+                    ",".join("{:.3g}".format(z) for z in z_dlas),
+                    ",".join("{:.3g}".format(n) for n in log_nhis),
+                    ",".join("{:.3g}".format(p) for p in dla_confidences),
+                ),
+                color="orange",
+            )
+        if nth >= 0:
+            plt.plot(
+                rest_wavelengths,
+                this_mu,
+                label=label
+                + r"$\mathcal{M}$"
+                + r" DLA({n})".format(n=nth + 1)
+                + ": {:.3g}; ".format(
+                    self.model_posteriors[nspec, 1 + self.sub_dla + nth]
+                )
+                + "lognhi = ({})".format(
+                    ",".join("{:.3g}".format(n) for n in map_log_nhis)
+                ),
+                color=color,
+            )
+        else:
+            plt.plot(
+                rest_wavelengths,
+                this_mu,
+                label=label
+                + r"$\mathcal{M}$"
+                + r" DLA({n})".format(n=0)
+                + ": {:.3g}".format(self.p_no_dlas[nspec]),
+                color=color,
+            )
+
+        # [conditional GP]
+        if conditional_gp:
+            ind_1 = self.GP.x <= lya_wavelength
+            y2 = self.GP.y[~ind_1]
+            this_mu1 = self.GP.this_mu[ind_1]
+            this_mu2 = self.GP.this_mu[~ind_1]
+            this_M1 = self.GP.this_M[ind_1, :]
+            this_M2 = self.GP.this_M[~ind_1, :]
+            d1 = self.GP.v[ind_1] + self.GP.this_omega2[ind_1]
+            d2 = self.GP.v[~ind_1] + self.GP.this_omega2[~ind_1]
+
+            mu1, Sigma11 = conditional_mvnpdf_low_rank(
+                y2, this_mu1, this_mu2, this_M1, this_M2, d1, d2
+            )
+
+            plt.plot(
+                self.GP.x[ind_1],
+                mu1[:, 0],
+                label="conditional GP (suppressed)",
+                color=color_cond,
+            )
+
+        plt.xlabel(r"rest-wavelengths $\lambda_{\mathrm{rest}}$ $\AA$")
+        plt.ylabel(r"normalised flux")
+        plt.legend()
+
+        if nth >= 0:
+            return rest_wavelengths, this_mu, map_z_dlas, map_log_nhis
+        return rest_wavelengths, this_mu
+
+    def find_meanflux_map_from_dla_map(self, nspec: int):
+        """
+        Find the meanflux MAP values reversely from logNHI MAP,
+        assuming logNHI samples are unique.
+        """
+        # use the first DLA parameter as a proxy to find the max index
+        map_log_nhi = self.all_log_nhis[nspec, 0]
+        assert ~np.isnan(map_log_nhi)
+
+        maxind = np.where(self.log_nhi_samples == map_log_nhi)[0][0]
+
+        return self.tau_0_samples[maxind], self.beta_samples[maxind]
 
     def load_dla_parks(
         self,
