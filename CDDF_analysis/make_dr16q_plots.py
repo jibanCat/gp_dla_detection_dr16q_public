@@ -556,18 +556,20 @@ def do_Parks_CDDF(
     (l_N, cddf) = qsos.plot_cddf_parks(
         dla_parks,
         zmax=5,
-        color="blue",
+        color="C4",
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         apply_p_dlas=False,
         prior=False,
         lyb=lyb,
         search_range_from_ours=search_range_from_ours,
+        label="CNN",
     )
     np.savetxt(os.path.join(subdir, "cddf_parks_all.txt"), (l_N, cddf))
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
+    plt.tight_layout()
     save_figure(os.path.join(subdir, "cddf_parks"))
     plt.clf()
 
@@ -632,6 +634,7 @@ def do_Parks_CDDF(
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
+    plt.tight_layout()
     save_figure(os.path.join(subdir, "cddf_zz_parks"))
     plt.clf()
 
@@ -663,11 +666,14 @@ def do_Parks_dNdX(
         prior=False,
         lyb=lyb,
         search_range_from_ours=search_range_from_ours,
+        color="C4",
+        label="CNN",
     )
     np.savetxt(os.path.join(subdir, "dndx_all.txt"), (z_cent, dNdX))
 
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
+    plt.tight_layout()
     save_figure(os.path.join(subdir, "dndx_parks"))
     plt.clf()
 
@@ -699,12 +705,15 @@ def do_Parks_OmegaDLA(
         snr_thresh=snr_thresh,
         lyb=lyb,
         search_range_from_ours=search_range_from_ours,
+        color="C4",
+        label="CNN",
     )
 
     np.savetxt(os.path.join(subdir, "omega_dla_all.txt"), (z_cent, omega_dla))
     plt.legend(loc=0)
     plt.xlim(2, 5)
     plt.ylim(0, 2.5)
+    plt.tight_layout()
     save_figure(os.path.join(subdir, "omega_parks"))
     plt.clf()
 
