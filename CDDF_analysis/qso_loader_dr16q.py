@@ -768,6 +768,9 @@ class QSOLoaderDR16Q(QSOLoader):
                 z_dlas.append(z_dla)
                 log_nhis.append(log_nhi)
 
+                if np.any(np.isnan(dict_parks["dla_confidences"][uid])):
+                    continue
+
                 absorption = Voigt_absorption(
                     rest_wavelengths * (1 + self.z_qsos[nspec]),
                     10 ** log_nhi,
