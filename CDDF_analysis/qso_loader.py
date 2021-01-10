@@ -2903,8 +2903,8 @@ class QSOLoader(object):
         # you do the test_ind indicing after storing the HDF5 array
         # into memory. Reading from numpy array from memory is much
         # faster than you do IO from the file.
-        ras = self.catalogue_file["ras"][0, :][self.test_ind]
-        decs = self.catalogue_file["decs"][0, :][self.test_ind]
+        ras = self.catalogue_file["ras"][0, :][self.test_real_index]
+        decs = self.catalogue_file["decs"][0, :][self.test_real_index]
 
         assert len(ras) == len(self.thing_ids)
 
@@ -2987,8 +2987,8 @@ class QSOLoader(object):
         # you do the test_ind indicing after storing the HDF5 array
         # into memory. Reading from numpy array from memory is much
         # faster than you do IO from the file.
-        ras = self.catalogue_file["ras"][0, :][self.test_ind]
-        decs = self.catalogue_file["decs"][0, :][self.test_ind]
+        ras = self.catalogue_file["ras"][0, :][self.test_real_index]
+        decs = self.catalogue_file["decs"][0, :][self.test_real_index]
 
         for i in quasar_inds:
             this_sub_dla = {}
