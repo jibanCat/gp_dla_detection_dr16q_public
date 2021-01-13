@@ -95,10 +95,11 @@ class DLACatalogue(object):
         z_dla_minimum: float = 0.1,
         raw_distfile: str = "DR16Q_v4.fits",  # DR16Q only
         zestimate_cut: bool = False,  # DR16Q only; remove zestimate disagreements
-        delta_z_qso: float = 0.3,     # DR16Q only; remove zestimate disagreements
+        delta_z_qso: float = 0.1,     # DR16Q only; remove zestimate disagreements
         is_qso_final_cut: bool = False,  # DR16Q only; only take final QSO samples
         class_person_cut: bool = False,  # DR16Q only; only take non-BAL samples
         z_source_cut: bool = False,  # DR16Q only; remove source_z='pipe' and z > 5
+        z_max_lyb: bool = False, # Lylimit only: in case you want to shift the maximum search range to lyb peak
     ):
         # Should we include the second DLA?
         self.second_dla = (
@@ -133,6 +134,8 @@ class DLACatalogue(object):
         # Exclude spectra closer to the tail of the spectrum, which has more dubious DLAs than average.
         self.highzcut = highzcut
         self.tail_zone = 0.1
+        # Exclude spectra between lymanbeta to lymanalpha
+        self.z_max_lyb = z_max_lyb
 
         self.raw_file = raw_file
         self.processed_file = processed_file
@@ -831,13 +834,22 @@ class DLACatalogue(object):
         ind = self._filter_snr_spectra() * self._filter_z_dlas(self.z_dla_minimum)
         max_z_dlas = np.array(self.z_max())[ind]
         min_z_dlas = np.array(self.z_min())[ind]
+        # remove the lyman alpha forest region to test lyinf-lybeta detections
+        if self.z_max_lyb:
+            print("[Info] testing on the range lyinf-lybeta")
+            max_z_dlas = np.max(
+                [np.min([max_z_dlas, self.lymanbeta(max_z_dlas)], axis=0), min_z_dlas],
+                axis=0,
+            )
         # Increase the minimum redshift to remove spectra contaminated by the lyman beta forest.
         if self.lowzcut:
+            print("[Info] testing z_max - proximity dz {}".format(self.proximity_zone))
             max_z_dlas = np.max(
                 [np.min([max_z_dlas, self.proximity(max_z_dlas)], axis=0), min_z_dlas],
                 axis=0,
             )
         if self.highzcut:
+            print("[Info] test z_min + tail dz {}".format(self.tail_zone))
             min_z_dlas = np.min(
                 [np.max([min_z_dlas, self.tail(min_z_dlas)], axis=0), max_z_dlas],
                 axis=0,
@@ -1446,9 +1458,14 @@ class DLACatalogue(object):
         for spec in dla_ind[0]:
             # Compute redshift of each sample
             (lnhi_vals, redshifts) = self._get_sample_params(spec, second=second)
-            # The low cutoff redshift.
+
             upper_z = ured
             lower_z = lred
+            # test lyinf - lybeta only
+            if self.z_max_lyb:
+                assert self.lowzcut == False
+                upper_z = np.min([self.lymanbeta(self.z_max(spec)), ured])
+            # The low cutoff redshift.
             if self.lowzcut:
                 upper_z = np.min([self.proximity(self.z_max(spec)), ured])
             if self.highzcut:
