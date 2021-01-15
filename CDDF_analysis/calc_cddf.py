@@ -100,6 +100,8 @@ class DLACatalogue(object):
         class_person_cut: bool = False,  # DR16Q only; only take non-BAL samples
         z_source_cut: bool = False,  # DR16Q only; remove source_z='pipe' and z > 5
         z_max_lyb: bool = False, # Lylimit only: in case you want to shift the maximum search range to lyb peak
+        min_obs_wavelength_cut: bool = False, # Cut out the tail part below certain obs lambda, default 4000 A
+        min_obs_wavelength: float = 4000, #A
     ):
         # Should we include the second DLA?
         self.second_dla = (
@@ -136,6 +138,9 @@ class DLACatalogue(object):
         self.tail_zone = 0.1
         # Exclude spectra between lymanbeta to lymanalpha
         self.z_max_lyb = z_max_lyb
+        # Exclude the dubious part of the obs wavelengths
+        self.min_obs_wavelength_cut = min_obs_wavelength_cut
+        self.min_obs_wavelength = min_obs_wavelength #A
 
         self.raw_file = raw_file
         self.processed_file = processed_file
@@ -854,6 +859,15 @@ class DLACatalogue(object):
                 [np.max([min_z_dlas, self.tail(min_z_dlas)], axis=0), max_z_dlas],
                 axis=0,
             )
+        if self.min_obs_wavelength_cut:
+            # obs lambda to z sampling -> obs lambda / (1 + zQSO)
+            z_obs_min =  self.min_obs_wavelength / (1 + max_z_dlas + 0.01)
+            print("[Info] test exlcuding everything lower than obs lambda {}A".format(self.min_obs_wavelength))
+            min_z_dlas = np.min(
+                [np.max([min_z_dlas, z_obs_min], axis=0), max_z_dlas],
+                axis=0,
+            )
+
         assert np.all(max_z_dlas - min_z_dlas >= 0)
         # Filter spectra that aren't in our redshift range
         i2 = np.where(np.logical_and(min_z_dlas < z_max, max_z_dlas > z_min))
@@ -1470,6 +1484,14 @@ class DLACatalogue(object):
                 upper_z = np.min([self.proximity(self.z_max(spec)), ured])
             if self.highzcut:
                 lower_z = np.max([self.tail(self.z_min(spec)), lred])
+            if self.min_obs_wavelength_cut:
+                # obs lambda to z sampling -> obs lambda / (1 + zQSO)
+                z_obs_min =  self.min_obs_wavelength / (1 + ured + 0.01)
+                lower_z = np.min(
+                    [np.max([lower_z, z_obs_min], axis=0), lred],
+                    axis=0,
+                )
+
             # Select only samples with a DLA value, within the redshift we want.
             desired_samples = (
                 (lnhi_vals > lnhi_min)
