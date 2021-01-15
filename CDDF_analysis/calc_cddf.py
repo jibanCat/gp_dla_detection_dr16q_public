@@ -862,6 +862,7 @@ class DLACatalogue(object):
         if self.min_obs_wavelength_cut:
             # obs lambda to z sampling -> obs lambda / (1 + zQSO)
             z_obs_min =  self.min_obs_wavelength / (lya_wavelength) - 1
+            z_obs_min = np.ones_like(min_z_dlas) * z_obs_min
             print("[Info] test exlcuding everything lower than obs lambda {}A".format(self.min_obs_wavelength))
             min_z_dlas = np.min(
                 [np.max([min_z_dlas, z_obs_min], axis=0), max_z_dlas],
@@ -1487,10 +1488,7 @@ class DLACatalogue(object):
             if self.min_obs_wavelength_cut:
                 # obs lambda to z sampling -> obs lambda / (1 + zQSO)
                 z_obs_min =  self.min_obs_wavelength / (lya_wavelength) - 1
-                lower_z = np.min(
-                    [np.max([lower_z, z_obs_min], axis=0), lred],
-                    axis=0,
-                )
+                lower_z = np.max([z_obs_min, lred])
 
             # Select only samples with a DLA value, within the redshift we want.
             desired_samples = (
