@@ -312,7 +312,7 @@ class QSOLoaderDR16Q(QSOLoader):
             )
             self.condition = self.condition * z_source_condition
 
-    def zestimation_cut(self, delta_z_qso: float = 0.2):
+    def zestimation_cut(self, delta_z_qso: float = 0.1):
         """
         Cut spectra with zQSO disagreements
         """

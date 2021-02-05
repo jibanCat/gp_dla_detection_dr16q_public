@@ -190,12 +190,16 @@ def do_cddf_occams(
     label_upper: str = "GP Occams upper",
     label_lower: str = "GP Occams lower",
     outfile: str = "cddf_gp_occams",
-    plot_gp: bool = True, 
+    color_upper: str = "C1",
+    color_lower: str = "C2",
+    plot_gp: bool = True,
+    plot_n12: bool = False,
 ):
     """
     Make CDDF plots with systematics from Occams razors.
     """
-    dla_data.noterdaeme_12_data()
+    if plot_n12:
+        dla_data.noterdaeme_12_data()
 
     # (l_N, cddf, cddf68[:,0], cddf68[:,1], cddf95[:,0],cddf95[:,1]) in (6, N) shape
     if plot_gp:
@@ -216,7 +220,7 @@ def do_cddf_occams(
     cddf95 = np.full((N, 2), fill_value=np.nan)
     (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
-    plot_cddf(l_N, cddf, cddf68, cddf95, label=label_upper, color="C1")
+    plot_cddf(l_N, cddf, cddf68, cddf95, label=label_upper, color=color_upper)
 
     # lower
     cddf_all = np.loadtxt(os.path.join(subdir_occams_lower, "cddf_all.txt"))
@@ -226,7 +230,7 @@ def do_cddf_occams(
     cddf95 = np.full((N, 2), fill_value=np.nan)
     (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
 
-    plot_cddf(l_N, cddf, cddf68, cddf95, label=label_lower, color="C2")
+    plot_cddf(l_N, cddf, cddf68, cddf95, label=label_lower, color=color_lower)
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
@@ -297,6 +301,8 @@ def do_dndx_occams(
     subdir_occams_lower: str = "CDDF_analysis",
     label_upper: str = "GP Occams upper",
     label_lower: str = "GP Occams lower",
+    color_upper: str = "C1",
+    color_lower: str = "C2",
     outfile: str = "dndx_gp_occams",
     plot_gp: bool = True, 
 ):
@@ -325,7 +331,7 @@ def do_dndx_occams(
     dndx95 = np.full((N, 2), fill_value=np.nan)
     (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
-    plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C1", label=label_upper)
+    plot_line_density(z_cent, dNdX, dndx68, dndx95, color=color_upper, label=label_upper)
 
     # Occams Lower
     dndx_all = np.loadtxt(os.path.join(subdir_occams_lower, "dndx_all.txt"))
@@ -335,7 +341,7 @@ def do_dndx_occams(
     dndx95 = np.full((N, 2), fill_value=np.nan)
     (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
-    plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C2", label=label_lower)
+    plot_line_density(z_cent, dNdX, dndx68, dndx95, color=color_lower, label=label_lower)
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
     plt.tight_layout()
@@ -359,8 +365,11 @@ def plot_line_density(
     nbins = np.max([int((zmax - zmin) * bins_per_z), 1])
     z_bins = np.linspace(zmin, zmax, nbins + 1)
 
-    # hope this line works
-    xerrs = (z_cent - z_bins[:-1], z_bins[1:] - z_cent)
+    try:
+        # hope this line works
+        xerrs = (z_cent - z_bins[:-1], z_bins[1:] - z_cent)
+    except ValueError as e:
+        xerrs = (z_cent - z_bins[:-2], z_bins[1:-1] - z_cent)
 
     # 2 sigma contours.
     plt.fill_between(z_cent, dndx95[:, 0], dndx95[:, 1], color="grey", alpha=0.5)
@@ -377,15 +386,22 @@ def do_omega_dla_occams(
     subdir_occams_lower: str = "CDDF_analysis",
     label_upper: str = "GP Occams upper",
     label_lower: str = "GP Occams lower",
+    color_upper: str = "C1",
+    color_lower: str = "C2",
     outfile: str = "omega_occams",
-    plot_gp: bool = True, 
+    plot_gp: bool = True,
+    plot_pw09: bool = False,
+    xq100_omega: bool = True,
 ):
     """
     Make OmegaDLA plots with systematics from Occams razors.
     """
     dla_data.omegahi_not()
-    dla_data.omegahi_pro()
+    if plot_pw09:
+        dla_data.omegahi_pro()
     dla_data.crighton_omega()
+    if xq100_omega:
+        dla_data.xq100_omega()
 
     # (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) in (6, N) shape
     if plot_gp:
@@ -425,7 +441,7 @@ def do_omega_dla_occams(
         omega_dla,
         omega_dla_68,
         omega_dla_95,
-        color="C1",
+        color=color_upper,
         label=label_upper,
     )
 
@@ -449,7 +465,7 @@ def do_omega_dla_occams(
         omega_dla,
         omega_dla_68,
         omega_dla_95,
-        color="C2",
+        color=color_lower,
         label=label_lower,
     )
 
@@ -461,12 +477,13 @@ def do_omega_dla_occams(
     plt.clf()
 
 
-def do_omega_dla_XQ100(subdir: str = "CDDF_analysis"):
+def do_omega_dla_XQ100(subdir: str = "CDDF_analysis", plot_pw09: bool = False):
     """
     Make OmegaDLA plots with systematics from Occams razors.
     """
     dla_data.omegahi_not()
-    dla_data.omegahi_pro()
+    if plot_pw09:
+        dla_data.omegahi_pro()
     dla_data.crighton_omega()
     dla_data.xq100_omega()
 
@@ -511,7 +528,11 @@ def plot_omega_dla(
     nbins = np.max([int((zmax - zmin) * bins_per_z), 1])
     z_bins = np.linspace(zmin, zmax, nbins + 1)
 
-    xerrs = (z_cent - z_bins[:-1], z_bins[1:] - z_cent)
+    try:
+        # hope this line works
+        xerrs = (z_cent - z_bins[:-1], z_bins[1:] - z_cent)
+    except ValueError as e:
+        xerrs = (z_cent - z_bins[:-2], z_bins[1:-1] - z_cent)
 
     # import pdb
     # pdb.set_trace()
