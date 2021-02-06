@@ -1,11 +1,6 @@
 % generate_dla_samples: generates DLA parameter samples from training
 % catalog
 
-% [train_dr12q] also load the processed file
-training_release = 'dr12q';
-processed = load(sprintf('%s/processed_qsos_multi_lyseries_a03_lyb_zwarn_occams_dr12q', ...
-       processed_directory(training_release)));
-
 % load training catalog
 catalog = load(sprintf('%s/catalog', processed_directory(training_release)));
 
@@ -28,11 +23,9 @@ u = makedist('uniform', ...
              'upper', uniform_max_log_nhi);
 
 % extract observed log₁₀ N_HI samples from catalog
-ind = (processed.p_dlas > 0.99);
-fprintf('Training for logNHI prior %d', sum(ind));
-
-% [train_dr12q] only get the first DLA out
-log_nhis = processed.MAP_log_nhis(ind, 1, 1);
+all_log_nhis = catalog.log_nhis(dla_catalog_name);
+ind = cellfun(@(x) (~isempty(x)), all_log_nhis);
+log_nhis = cat(1, all_log_nhis{ind});
 
 % make a quadratic fit to the estimated log p(log₁₀ N_HI) over the
 % specified range
@@ -65,6 +58,7 @@ nhi_samples = 10.^log_nhi_samples;
 
 variables_to_save = {'uniform_min_log_nhi', 'uniform_max_log_nhi', ...
                      'fit_min_log_nhi', 'fit_max_log_nhi', 'alpha', ...
-                     'offset_samples', 'log_nhi_samples', 'nhi_samples', 'f'};
-save(sprintf('%s/dla_samples_dr12q', processed_directory(training_release)), ...
+                     'offset_samples', 'log_nhi_samples', 'nhi_samples'};
+save(sprintf('%s/dla_samples_a03_%d', processed_directory(training_release), ...
+     num_dla_samples), ...
      variables_to_save{:}, '-v7.3');

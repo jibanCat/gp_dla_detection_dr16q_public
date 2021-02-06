@@ -3,9 +3,6 @@
 
 cd ..
 
-addpath multi_dlas/
-addpath dr16q/
-
 set_parameters_multi;
 
 cd minFunc_2012/
@@ -14,4 +11,4 @@ mexAll;
 cd ..
 
 training_set_name = 'dr16q_minus_dr12q_gp';
-learn_qso_model_meanflux_dr16q;
+learn_qso_model;
