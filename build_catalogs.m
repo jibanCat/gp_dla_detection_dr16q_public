@@ -1,4 +1,4 @@
-% build_catalogs_dr16q: loads existing QSO and DLA catalogs, applies some
+% build_catalogs: loads existing QSO and DLA catalogs, applies some
 % initial filters, and creates a list of spectra to download from SDSS
 %
 % ZWARNING: ensure we exclude those spectra with bad redshift status reported

@@ -1,4 +1,4 @@
-% process_qsos_multiple_dlas_meanflux_full_int: run DLA detection algorithm on specified objects
+% process_qsos: run DLA detection algorithm on specified objects
 % while using lower lognhi range (defined in set_lls_parameters.m) as an alternative model; 
 % Note: model_posterior(quasar_ind, :) ... 
 % = [p(no dla | D), p(lls | D), p(1 dla | D), p(2 dla | D), ...]

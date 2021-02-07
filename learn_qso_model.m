@@ -1,4 +1,4 @@
-% learn_qso_model_meanflux: fits GP to training catalog via maximum likelihood
+% learn_qso_model: fits GP to training catalog via maximum likelihood
 %   mean vector is modelled to change with the mean-flux with the implemetation of Lyman-series forest 
 %   using Kim's mean values. Also, noise variance is modelled to include Lyman series.
 %
