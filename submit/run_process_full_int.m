@@ -20,7 +20,7 @@ for i = qso_start_ind:qso_end_ind
 
     % prior settings
     % specify the learned quasar model to use
-    training_release  = 'dr16q';                % where the leanrned file is
+    training_release  = 'dr16q';                % where the learned file is
     training_set_name = 'dr16q_minus_dr12q_gp';
     prior_release     = 'dr12q';                % where the prior catalog and sample files are
 

@@ -3,4 +3,4 @@
 cd ..
 
 set_parameters;
-build_catalog;
+build_catalogs;
