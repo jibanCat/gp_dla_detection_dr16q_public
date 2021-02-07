@@ -3,7 +3,7 @@
 
 cd ..
 
-set_parameters_multi;
+set_parameters;
 
 cd minFunc_2012/
 addpath(genpath(pwd));
