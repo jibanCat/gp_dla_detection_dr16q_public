@@ -77,8 +77,8 @@ installed easily with [Homebrew](http://brew.sh/index.html).
 `download_spectra_dr16q.sh` will download the observational data for the yet
 unfiltered lines of sight to the `data/dr16q/spectra` directory.
 
-> The pre-computed DR16Q [`catalog.mat`](https://drive.google.com/file/d/1SSFpdgrB5RDotlE8IqUD14DMlf_RQ0H7/view?usp=sharing) is available in the above drive link. Place it under `data/dr16q/processed/`.
-> The pre-computed DR12Q [`catalog`](https://drive.google.com/file/d/1-DE6NdFhaEcI0bk-l-GiN2DzxoWoLW-L/view?usp=sharing) is available in the above drive link. Place it under `data/dr12q/processed/`
+> * The pre-computed DR16Q [`catalog.mat`](https://drive.google.com/file/d/1SSFpdgrB5RDotlE8IqUD14DMlf_RQ0H7/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/`.  
+> * The pre-computed DR12Q [`catalog`](https://drive.google.com/file/d/1-DE6NdFhaEcI0bk-l-GiN2DzxoWoLW-L/view?usp=sharing) is available in the link. Place it under `data/dr12q/processed/`.
 
 Loading and preprocessing spectra
 ---------------------------------
@@ -134,7 +134,7 @@ information and a file containing preloaded and preprocessed data for
 the 160227 nonfiltered spectra,
 `data/[release]/processed/preloaded_qsos.mat`.
 
-> (The pre-computed [`preloaded_qsos.mat`](https://drive.google.com/file/d/1Q_42wFxkD_SvbvqtQ8QXlkZW90wQz4oP/view?usp=sharing) is available in the above drive link)
+> * The pre-computed [`preloaded_qsos.mat`](https://drive.google.com/file/d/1Q_42wFxkD_SvbvqtQ8QXlkZW90wQz4oP/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/`
 
 Building GP models for quasar spectra
 -------------------------------------
@@ -235,8 +235,8 @@ samples is:
     generate_dla_samples;
     generate_optical_depth_samples_full_int;
 
-> The pre-computed [`learned_qso_model_lyseries_variance_wmu_boss_minus_dr12q_gp_851-1421.mat`](https://drive.google.com/file/d/1R4KvOKzQe17SheEYY8Mc7ia6OErbTL6x/view?usp=sharing) is available in the above drive link. Place it under `data/dr16q/processed/`
-> The pre-computed parameter sample files are available at [`tau_0_samples_30000.mat`](https://drive.google.com/file/d/123Egf9VmyCt621S_i9kpX1KZoM-djACJ/view?usp=sharing) and [`dla_samples_a03_30000.mat`](https://drive.google.com/file/d/1Ap3TlVUvZxlsJIZTMhF02-EMkT9jhJ43/view?usp=sharing). Place them under `data/dr12q/processed/`
+> * The pre-computed [`learned_qso_model_lyseries_variance_wmu_boss_minus_dr12q_gp_851-1421.mat`](https://drive.google.com/file/d/1R4KvOKzQe17SheEYY8Mc7ia6OErbTL6x/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/`.  
+> * The pre-computed parameter sample files are available at [`tau_0_samples_30000.mat`](https://drive.google.com/file/d/123Egf9VmyCt621S_i9kpX1KZoM-djACJ/view?usp=sharing) and [`dla_samples_a03_30000.mat`](https://drive.google.com/file/d/1Ap3TlVUvZxlsJIZTMhF02-EMkT9jhJ43/view?usp=sharing). Place them under `data/dr12q/processed/`.
 
 Processing spectra for DLA detection
 ------------------------------------
@@ -322,7 +322,7 @@ When ready, the selected spectra can be processed with `process_qsos`.
 This script will write the results in
 `data/[release]/processed_qsos_[test_set_name].mat`.
 
-The complete code for processing the spectra in MATLAB is:
+The complete code for processing the selected 101th~150th spectra in MATLAB is:
 
     % produce catalog searching [Lyoo + 3000 km/s, Lya - 3000 km/s]
     set_parameters;
