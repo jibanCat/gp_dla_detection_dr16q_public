@@ -77,8 +77,8 @@ installed easily with [Homebrew](http://brew.sh/index.html).
 `download_spectra_dr16q.sh` will download the observational data for the yet
 unfiltered lines of sight to the `data/dr16q/spectra` directory.
 
-> * The pre-computed DR16Q [`catalog.mat`](https://drive.google.com/file/d/1SSFpdgrB5RDotlE8IqUD14DMlf_RQ0H7/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/`.  
-> * The pre-computed DR12Q [`catalog`](https://drive.google.com/file/d/1-DE6NdFhaEcI0bk-l-GiN2DzxoWoLW-L/view?usp=sharing) is available in the link. Place it under `data/dr12q/processed/`.
+> * The pre-computed DR16Q [`catalog.mat`](https://drive.google.com/file/d/1SSFpdgrB5RDotlE8IqUD14DMlf_RQ0H7/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/` to skip the step of this section.  
+> * The pre-computed DR12Q [`catalog.mat`](https://drive.google.com/file/d/1-DE6NdFhaEcI0bk-l-GiN2DzxoWoLW-L/view?usp=sharing) is available in the link. Place it under `data/dr12q/processed/` to skip the step of this section.
 
 Loading and preprocessing spectra
 ---------------------------------
@@ -94,9 +94,9 @@ preprocessing. The additional filters are:
 The preprocessing steps are to:
 
 * truncate spectra to only contain pixels in the range [800, 1550]
-  Angstroms QSO rest
+  Angstroms QSO restframe
 * normalize flux and noise variance by dividing by the median flux in
-  the range [1425, 1475] Angstroms QSO rest
+  the range [1425, 1475] Angstroms QSO restframe
 
 Relevant parameters in `set_parameters` that can be tweaked if
 desired:
@@ -134,7 +134,7 @@ information and a file containing preloaded and preprocessed data for
 the 160227 nonfiltered spectra,
 `data/[release]/processed/preloaded_qsos.mat`.
 
-> * The pre-computed [`preloaded_qsos.mat`](https://drive.google.com/file/d/1Q_42wFxkD_SvbvqtQ8QXlkZW90wQz4oP/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/`
+> * The pre-computed [`preloaded_qsos.mat`](https://drive.google.com/file/d/1Q_42wFxkD_SvbvqtQ8QXlkZW90wQz4oP/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/` to skip the step of this section.
 
 Building GP models for quasar spectra
 -------------------------------------
@@ -235,8 +235,8 @@ samples is:
     generate_dla_samples;
     generate_optical_depth_samples_full_int;
 
-> * The pre-computed [`learned_qso_model_lyseries_variance_wmu_boss_minus_dr12q_gp_851-1421.mat`](https://drive.google.com/file/d/1R4KvOKzQe17SheEYY8Mc7ia6OErbTL6x/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/`.  
-> * The pre-computed parameter sample files are available at [`tau_0_samples_30000.mat`](https://drive.google.com/file/d/123Egf9VmyCt621S_i9kpX1KZoM-djACJ/view?usp=sharing) and [`dla_samples_a03_30000.mat`](https://drive.google.com/file/d/1Ap3TlVUvZxlsJIZTMhF02-EMkT9jhJ43/view?usp=sharing). Place them under `data/dr12q/processed/`.
+> * The pre-computed [`learned_qso_model_lyseries_variance_wmu_boss_minus_dr12q_gp_851-1421.mat`](https://drive.google.com/file/d/1R4KvOKzQe17SheEYY8Mc7ia6OErbTL6x/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/` to skip the step of this section.  
+> * The pre-computed parameter sample files are available at [`tau_0_samples_30000.mat`](https://drive.google.com/file/d/123Egf9VmyCt621S_i9kpX1KZoM-djACJ/view?usp=sharing) and [`dla_samples_a03_30000.mat`](https://drive.google.com/file/d/1Ap3TlVUvZxlsJIZTMhF02-EMkT9jhJ43/view?usp=sharing). Place them under `data/dr12q/processed/` to skip the step of this section.
 
 Processing spectra for DLA detection
 ------------------------------------
