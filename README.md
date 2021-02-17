@@ -1,12 +1,20 @@
-DLA detection pipleine for BOSS quasar spectra
+DLA detection pipleine for SDSS/eBOSS DR16 quasar spectra
 ==============================================
 
-This code repository contains code to completely reproduce the DLA
-catalog reported in
+<!-- This code repository contains code to completely reproduce the DLA
+catalog reported in -->
+
+The code is derived from the DLA detection code reported in
 
 > R Garnett, S Ho, S Bird, and J Schnedier. Detecting Damped Lyman-α
 > Absorbers with Gaussian Processes. [arXiv:1605.04460
 > [astro-ph.CO]](https://arxiv.org/abs/1605.04460),
+
+and
+
+> M-F Ho, S Bird, and R Garnett. Detecting Multiple DLAs per
+> Spectrum in SDSS DR12 with Gaussian Processes. [arXiv:2003.11036
+> [astro-ph.CO]](https://arxiv.org/abs/2003.11036),
 
 including all intermediate data products including the Gaussian
 process null model described therein. The provided parameters should
@@ -18,7 +26,7 @@ The pipeline has multiple stages, outlined and documented below.
 Loading catalogs and downloading spectra
 ----------------------------------------
 
-The first step of the process is to load the DR12Q quasar catalog and
+The first step of the process is to load the DR12Q and DR16Q quasar catalog and
 available DLA catalogs, extract some basic data such as redshift,
 coordinates, etc., and apply some basic filtering to the spectra:
 
@@ -34,33 +42,43 @@ Relevant parameters in `set_parameters` that can be tweaked if desired:
 This process proceeds in three steps, alternating between the shell
 and MATLAB.
 
-First we download the raw catalog data:
+First we download the raw DR12Q and DR16Q catalog data:
 
     # in shell
     cd data/scripts
     ./download_catalogs.sh
+    ./download_catalogs_dr16q.sh
+
+Before building the catalogs, we need to download the DR12 DLA catalog
+from our previous model (Ho 2020). Download the file with
+this link [processed_qsos_multi_lyseries_a03_zwarn_occams_trunc_dr12q.mat](https://drive.google.com/file/d/1rCNvBifTIM225cNeQ4RKXlC4m-wuLjMJ/view?usp=sharing)
+and put the file to `data/dr12q/processed/`.
 
 Then we load these catalogs into MATLAB:
 
     % in MATLAB
     set_parameters;
     build_catalogs;
+    build_catalog_dr12q;
 
 The `build_catalogs` script will produce a file called `file_list` in
-the `data/dr12q/spectra` directory containing relative paths to
+the `data/dr16q/spectra` directory containing relative paths to
 yet-unfiltered SDSS spectra for download. The `file_list` output is
 available in this repository in the same location. The next step is to
 download the coadded "speclite" SDSS spectra for these observations
-(warning: total download is 35 GB). The `download_spectra.sh` script
+(warning: total download is 35 GB). The `download_spectra_dr16q.sh` script
 requires `wget` to be available. On OS X systems, this may be
 installed easily with [Homebrew](http://brew.sh/index.html).
 
     # in shell
     cd data/scripts
-    ./download_spectra.sh
+    ./download_spectra_dr16q.sh
 
-`download_spectra.sh` will download the observational data for the yet
-unfiltered lines of sight to the `data/dr12q/spectra` directory.
+`download_spectra_dr16q.sh` will download the observational data for the yet
+unfiltered lines of sight to the `data/dr16q/spectra` directory.
+
+> * The pre-computed DR16Q [`catalog.mat`](https://drive.google.com/file/d/1SSFpdgrB5RDotlE8IqUD14DMlf_RQ0H7/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/` to skip the step of this section.  
+> * The pre-computed DR12Q [`catalog.mat`](https://drive.google.com/file/d/1-DE6NdFhaEcI0bk-l-GiN2DzxoWoLW-L/view?usp=sharing) is available in the link. Place it under `data/dr12q/processed/` to skip the step of this section.
 
 Loading and preprocessing spectra
 ---------------------------------
@@ -68,36 +86,37 @@ Loading and preprocessing spectra
 Now we load these data, continue applying filters, and do some basic
 preprocessing. The additional filters are:
 
-* spectra that have no nonmasked pixels in the range [1310, 1325]
+* spectra that have no nonmasked pixels in the range [1425, 1475]
   Angstroms (QSO restframe) are filtered, as they cannot be normalized
-* spectra with fewer than 200 nonmasked pixels in the range [911,
-  1217] Angstroms (QSO restframe) are filtered.
+* spectra with fewer than 200 nonmasked pixels in the range [911.7633,
+  1215.6701] Angstroms (QSO restframe) are filtered.
 
 The preprocessing steps are to:
 
-* truncate spectra to only contain pixels in the range [911, 1217]
-  Angstroms QSO rest
+* truncate spectra to only contain pixels in the range [800, 1550]
+  Angstroms QSO restframe
 * normalize flux and noise variance by dividing by the median flux in
-  the range [1310, 1325] Angstroms QSO rest
+  the range [1425, 1475] Angstroms QSO restframe
 
 Relevant parameters in `set_parameters` that can be tweaked if
 desired:
 
     % preprocessing parameters
-    min_num_pixels = 200;                         % minimum number of non-masked pixels
+    min_num_pixels = 200;                         % minimum number of non-masked pixels (within Lyman
+                                                  % limit to lyman alpha)
 
     % normalization parameters
-    normalization_min_lambda = 1310;              % range of rest wavelengths to use   Å
-    normalization_max_lambda = 1325;              %   for flux normalization
+    normalization_min_lambda = 1425;              % range of rest wavelengths to use   Å
+    normalization_max_lambda = 1475;              %   for flux normalization
 
     % file loading parameters
-    loading_min_lambda = 910;                     % range of rest wavelengths to load  Å
-    loading_max_lambda = 1217;
+    loading_min_lambda = 800;                     % range of rest wavelengths to load  Å
+    loading_max_lambda = 1550;
 
 When ready, the MATLAB code to preload the spectra is:
 
     set_parameters;
-    release = 'dr12q';
+    release = 'dr16q';
 
     file_loader = @(plate, mjd, fiber_id) ...
       (read_spec(sprintf('%s/%i/spec-%i-%i-%04i.fits', ...
@@ -112,8 +131,10 @@ When ready, the MATLAB code to preload the spectra is:
 The result will be a completed catalog data file,
 `data/[release]/processed/catalog.mat`, with complete filtering
 information and a file containing preloaded and preprocessed data for
-the 162861 nonfiltered spectra,
+the 160227 nonfiltered spectra,
 `data/[release]/processed/preloaded_qsos.mat`.
+
+> * The pre-computed [`preloaded_qsos.mat`](https://drive.google.com/file/d/1Q_42wFxkD_SvbvqtQ8QXlkZW90wQz4oP/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/` to skip the step of this section.
 
 Building GP models for quasar spectra
 -------------------------------------
@@ -125,20 +146,20 @@ To build the null model for quasar emission spectra, we need to
 indicate a set of spectra to use for training, which should be
 nominally DLA-free. Here we select all spectra:
 
-* in DR9
+* in DR12
+* the difference between the redshift estimation from DR12 and DR16 < 0.01
 * not removed by our filtering steps during loading
-* in the DR9 Lyman-alpha forest catalog, and
-* not in the DR9 Lyman-alpha DLA concordance catalog
+* not in our GP DR12 DLA catalog (Ho 2020) (`p_dlas <= 0.9`)
 
-These particular choices may be accomplished with:
+These particular choices are written in `learn_qso_model.m`:
 
-    training_release  = 'dr12q';
-    dla_catalog_name = 'dr9q_concordance';
+    training_release  = 'dr16q';
+    dla_catalog_name  = 'dr12q_gp';
     train_ind = ...
-        [' catalog.in_dr9                     & ' ...
-         '(catalog.filter_flags == 0)         & ' ...
-         ' catalog.los_inds(dla_catalog_name) & ' ...
-         '~catalog.dla_inds(dla_catalog_name)'];
+        [' catalog.in_dr12_z                  & ' ...
+        '(catalog.filter_flags == 0)         & ' ...
+        ' catalog.los_inds(dla_catalog_name) & ' ...
+        '~catalog.dla_inds(dla_catalog_name)'];
 
 After specifying the spectra to use in `training_release` and
 `train_ind`, we call `learn_qso_model` to learn the model.
@@ -157,28 +178,27 @@ Relevant parameters in `set_parameters` that can be tweaked if
 desired:
 
     % null model parameters
-    min_lambda         =  911.75;                 % range of rest wavelengths to       Å
-    max_lambda         = 1215.75;                 %   model
+    min_lambda         =  850.75;                 % range of rest wavelengths to       Å
+    max_lambda         = 1420.75;                 %   model
     dlambda            =    0.25;                 % separation of wavelength grid      Å
     k                  = 20;                      % rank of non-diagonal contribution
-    max_noise_variance = 1^2;                     % maximum pixel noise allowed during model training
+    max_noise_variance = 3^2;                     % maximum pixel noise allowed during model training
 
     % optimization parameters
-    initial_c     = 0.1;                          % initial guess for c
-    initial_tau_0 = 0.0023;                       % initial guess for τ₀
-    initial_beta  = 3.65;                         % initial guess for β
+    initial_c_0   = 0.1;                          % initial guess for c₀
+    initial_tau_0 = 0.00554;                      % initial guess for τ₀
+    initial_beta  = 3.182;                        % initial guess for β
     minFunc_options =               ...           % optimization options for model fitting
         struct('MaxIter',     2000, ...
-               'MaxFunEvals', 4000);
+            'MaxFunEvals', 4000);
 
 When ready, the MATLAB code to learn the null quasar emission model
 is:
 
-    training_set_name = 'dr9q_minus_concordance';
     learn_qso_model;
 
 The learned qso model is stored in
-`data/[training_release]/processed/learned_qso_model_[training_set_name].mat`.
+`data/dr16q/processed/learned_qso_model_lyseries_variance_wmu_boss_minus_dr12q_gp_851-1421.mat`.
 
 We also need to specify a set of DLA parameter samples for the DLA
 model. This is handled by the `generate_dla_samples` script.
@@ -187,18 +207,36 @@ Relevant parameters in `set_parameters` that can be tweaked if
 desired:
 
     % DLA model parameters: parameter samples
-    num_dla_samples     = 10000;                  % number of parameter samples
-    alpha               = 0.9;                    % weight of KDE component in mixture
+    num_dla_samples     = 30000;                  % number of parameter samples
+    alpha               = 0.97;                   % weight of KDE component in mixture
     uniform_min_log_nhi = 20.0;                   % range of column density samples    [cm⁻²]
     uniform_max_log_nhi = 23.0;                   % from uniform distribution
     fit_min_log_nhi     = 20.0;                   % range of column density samples    [cm⁻²]
     fit_max_log_nhi     = 22.0;                   % from fit to log PDF
+
+Starting from our DR16 DLA catalog, we marginalize the uncertainty of meanflux measurement
+during processing. This requires a set of parameter samples for meanflux measurement,
+which is handled by the `generate_optical_depth_samples_full_int.m` script.
+
+Relevant parameters in `set_parameters` that can be tweaked if
+desired:
+
+    % effective optical depth samples
+    num_optical_depth_samples =   30000;          % number of parameter samples
+    tau_0_mu                  = 0.00554;          % meanflux suppression for τ₀
+    tau_0_sigma               = 0.00064;          % meanflux suppression for τ₀
+    beta_mu                   =   3.182;          % meanflux suppression for β
+    beta_sigma                =   0.074;          % meanflux suppression for β
 
 When ready, the MATLAB code to generate the DLA model parameter
 samples is:
 
     training_release  = 'dr12q';
     generate_dla_samples;
+    generate_optical_depth_samples_full_int;
+
+> * The pre-computed [`learned_qso_model_lyseries_variance_wmu_boss_minus_dr12q_gp_851-1421.mat`](https://drive.google.com/file/d/1R4KvOKzQe17SheEYY8Mc7ia6OErbTL6x/view?usp=sharing) is available in the link. Place it under `data/dr16q/processed/` to skip the step of this section.  
+> * The pre-computed parameter sample files are available at [`tau_0_samples_30000.mat`](https://drive.google.com/file/d/123Egf9VmyCt621S_i9kpX1KZoM-djACJ/view?usp=sharing) and [`dla_samples_a03_30000.mat`](https://drive.google.com/file/d/1Ap3TlVUvZxlsJIZTMhF02-EMkT9jhJ43/view?usp=sharing). Place them under `data/dr12q/processed/` to skip the step of this section.
 
 Processing spectra for DLA detection
 ------------------------------------
@@ -222,8 +260,8 @@ must specify which quasar emission model to use; to select the one
 learned above, we may use
 
     % specify the learned quasar model to use
-    training_release  = 'dr12q';
-    training_set_name = 'dr9q_minus_concordance';
+    training_release  = 'dr16q';                % where the learned file is
+    training_set_name = 'dr16q_minus_dr12q_gp';
 
 (the code will attempt to load the model from a file called
 `data/[training_release]/processed/learned_qso_model_[training_set_name].mat`.)
@@ -238,19 +276,23 @@ prior Pr(M_DLA). Here we select all spectra that are:
 These choices can be realized with:
 
     % specify the spectra to use for computing the DLA existence prior
+    prior_release     = 'dr12q';                % where the prior catalog and sample files are
     dla_catalog_name  = 'dr9q_concordance';
     prior_ind = ...
         [' prior_catalog.in_dr9 & ' ...
          ' prior_catalog.los_inds(dla_catalog_name) & ' ...
          '(prior_catalog.filter_flags == 0)'];
 
+(the code will attempt to load the model from a file called
+`data/[prior_release]/processed/catalog.mat`.)
+
 Next, we must specify which spectra to search for DLAs. Here we use
-all DR12Q spectra that were not filtered:
+all DR16Q spectra that were not filtered:
 
     % specify the spectra to process
-    release = 'dr12q';
-    test_set_name = 'dr12q';
-    test_ind = '(catalog.filter_flags == 0)';
+    release       = 'dr16q';
+    test_set_name = 'dr16q';
+    test_ind      = '(catalog.filter_flags == 0)';
 
 Relevant parameters in `set_parameters` that can be tweaked if
 desired, including function handles specifying the range of z_DLA to
@@ -280,14 +322,15 @@ When ready, the selected spectra can be processed with `process_qsos`.
 This script will write the results in
 `data/[release]/processed_qsos_[test_set_name].mat`.
 
-The complete code for processing the spectra in MATLAB is:
+The complete code for processing the selected 101th~150th spectra in MATLAB is:
 
     % produce catalog searching [Lyoo + 3000 km/s, Lya - 3000 km/s]
     set_parameters;
 
     % specify the learned quasar model to use
-    training_release  = 'dr12q';
-    training_set_name = 'dr9q_minus_concordance';
+    training_release  = 'dr16q';                % where the learned file is
+    training_set_name = 'dr16q_minus_dr12q_gp';
+    prior_release     = 'dr12q';                % where the prior catalog and sample files are
 
     % specify the spectra to use for computing the DLA existence prior
     dla_catalog_name  = 'dr9q_concordance';
@@ -297,13 +340,23 @@ The complete code for processing the spectra in MATLAB is:
          ' prior_catalog.los_inds(dla_catalog_name)'];
 
     % specify the spectra to process
-    release = 'dr12q';
-    test_set_name = 'dr12q';
-    test_ind = '(catalog.filter_flags == 0)';
+    release       = 'dr16q';
+    test_set_name = 'dr16q';
+    test_ind      = '(catalog.filter_flags == 0)';
+
+    % set lls parameters
+    set_lls_parameters;
+
+    % qsos_num_offset: the starting quasar_ind for the processed quasars
+    % num_quasars    : the size of the saved array
+    % 
+    % in the case we want to run the 101th~150th unfiltered quasar spectra in DR16Q
+    qsos_num_offset = 100;
+    num_quasars     = 50;
 
     % process the spectra
     process_qsos;
-
+<!-- 
 Finally, we may create an ASCII catalog of the results if desired with
 `generate_ascii_catalog`, e.g.:
 
@@ -312,4 +365,4 @@ Finally, we may create an ASCII catalog of the results if desired with
     release = 'dr12q';
     test_set_name = 'dr12q';
 
-    generate_ascii_catalog;
+    generate_ascii_catalog; -->

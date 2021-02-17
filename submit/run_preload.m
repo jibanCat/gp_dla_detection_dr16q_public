@@ -2,12 +2,9 @@
 
 cd ..
 
-addpath multi_dlas/
-addpath dr16q/
-
 release = 'dr16q';
 
-set_parameters_multi;
+set_parameters;
 assert(loading_max_lambda > 1400)
 
 file_loader = @(plate, mjd, fiber_id) ...
@@ -18,4 +15,4 @@ file_loader = @(plate, mjd, fiber_id) ...
     mjd,                                         ...
     fiber_id)));
 
-preload_qsos_dr16q;
+preload_qsos;
