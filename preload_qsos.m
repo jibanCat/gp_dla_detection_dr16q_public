@@ -1,4 +1,4 @@
-% preload_qsos_dr16q: loads spectra from SDSS FITS files, applies further
+% preload_qsos: loads spectra from SDSS DR16 FITS files, applies further
 % filters, and applies some basic preprocessing such as normalization
 % and truncation to the region of interest
 
