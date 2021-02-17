@@ -1,5 +1,7 @@
-% build_catalogs_dr12q: loads existing QSO and DLA catalogs, applies some
+% build_catalogs: loads existing QSO and DLA catalogs, applies some
 % initial filters, and creates a list of spectra to download from SDSS
+%
+% ZWARNING: ensure we exclude those spectra with bad redshift status reported
 
 % load QSO catalogs
 release = 'dr9q';
@@ -26,6 +28,7 @@ plates           =  dr12_catalog{5};
 mjds             =  dr12_catalog{6};
 fiber_ids        =  dr12_catalog{7};
 z_qsos           =  dr12_catalog{8};
+zwarning         =  dr12_catalog{11};
 snrs             =  dr12_catalog{33};
 bal_visual_flags = (dr12_catalog{56} > 0);
 
@@ -46,6 +49,13 @@ filter_flags(ind) = bitset(filter_flags(ind), 1, true);
 % filtering bit 1: BAL
 ind = (bal_visual_flags);
 filter_flags(ind) = bitset(filter_flags(ind), 2, true);
+
+% filtering bit 4: ZWARNING
+ind = (zwarning > 0);
+%% but include `MANY_OUTLIERS` in our samples (bit: 1000)
+ind_many_outliers      = (zwarning == bin2dec('10000'));
+ind(ind_many_outliers) = 0;
+filter_flags(ind) = bitset(filter_flags(ind), 5, true);
 
 los_inds = containers.Map();
 dla_inds = containers.Map();
@@ -86,7 +96,8 @@ release = 'dr12q';
 variables_to_save = {'sdss_names', 'ras', 'decs', 'thing_ids', 'plates', ...
                      'mjds', 'fiber_ids', 'z_qsos', 'snrs', ...
                      'bal_visual_flags', 'in_dr9', 'in_dr10', 'filter_flags', ...
-                     'los_inds', 'dla_inds', 'z_dlas', 'log_nhis'};
+                     'los_inds', 'dla_inds', 'z_dlas', 'log_nhis', ...
+                     'zwarning'};
 save(sprintf('%s/catalog', processed_directory(release)), ...
     variables_to_save{:}, '-v7.3');
 
