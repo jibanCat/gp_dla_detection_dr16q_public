@@ -849,8 +849,8 @@ class QSOLoaderDR16Q(QSOLoader):
                 color=color_cond,
             )
 
-        plt.xlabel(r"rest-wavelengths $\lambda_{\mathrm{rest}}$ $\AA$")
-        plt.ylabel(r"normalised flux")
+        plt.xlabel(r"Rest-frame Wavelength $(\AA)$")
+        plt.ylabel(r"Normalized Flux")
         plt.legend()
 
         if nth >= 0:
@@ -1059,3 +1059,134 @@ class QSOLoaderDR16Q(QSOLoader):
                 raw_log_nhis=raw_log_nhis,
                 raw_dla_confidences=raw_dla_confidences,
             )
+
+    def generate_json_catalogue(self, outfile: str = "predictions_DLAs_dr16q.json", flag_tail_dlas: bool = False, tail_zone: float = 0.1):
+        """
+        Generate the Multi-DLA catalogue in JSON format,
+        which has the same form as Parks' (2018) product.
+
+        Parameters:
+        ---
+        flag_tail_dlas: move tail detection to another column
+        tail_zone: the dz + blue end that we want to flag as tail dlas
+
+        Example template :
+        ----
+        [
+            {
+                "p_dla" : 0.9,
+                "p_no_dla" : 0.1,
+                "max_model_posteriors": 0.7,
+                "num_dlas": 1,
+                "dlas": [
+                    {
+                        "log_nhi": 20.78598574580358,
+                        "z_dla": 2.2291207038222756
+                    }
+                ],
+                "tail_dlas" : [
+                    {
+                        "log_nhi": 21,
+                        "z_dla": 2.3,
+                    }
+                ],
+                "min_z_dla": 2.0,
+                "max_z_dla": 2.18,
+                "ra": 9.2152,
+                "snr": 1.23,
+                "dec": -0.1659,
+                "plate": 3586,
+                "mjd": 55181,
+                "fiber_id": 16,
+                "thing_id": ,
+                "z_qso": 2.190
+            },
+            ...
+        ]
+        """
+        # initialise a list to store dicts
+        # we will save each spectrum into a dict.
+        # if there's any dla, we will just save the dlas as a list of
+        # dicts as an item in the spectrum dict.
+        predictions_DLAs = []
+
+        # query the maximum values of the model posteriors per spectrum first
+        model_index = self.model_posteriors.argmax(axis=1)
+        max_model_posteriors = self.model_posteriors.max(axis=1)
+
+        if self.sub_dla:
+            # now we need to combine sub-DLAs with null model posterior
+            # to get the mosterior of no-DLAs
+            inds = model_index < (1 + self.sub_dla)
+            max_model_posteriors[inds] = self.p_no_dlas[inds]
+
+            # prepare to use model_index as num_dlas
+            num_dlas = model_index - self.sub_dla
+            num_dlas[num_dlas < 0] = 0  # num_dlas should be positive
+
+        assert len(max_model_posteriors) == len(self.thing_ids)
+
+        # store some arrays here to query later
+        # you do the test_ind indicing after storing the HDF5 array
+        # into memory. Reading from numpy array from memory is much
+        # faster than you do IO from the file.
+        ras = self.catalogue_file["ras"][0, :][self.test_real_index]
+        decs = self.catalogue_file["decs"][0, :][self.test_real_index]
+
+        assert len(ras) == len(self.thing_ids)
+
+        for i, thing_id in enumerate(self.thing_ids):
+            spec = dict()
+
+            # you need to put .item() to convert numpy datatype to python datatype
+            # since json doesn't support serialize numpy datatype
+            spec["p_dla"] = self.p_dlas[i].item()
+            spec["p_no_dla"] = self.p_no_dlas[i].item()
+            spec["max_model_posterior"] = max_model_posteriors[i].item()
+            spec["num_dlas"] = num_dlas[i].item()
+            spec["min_z_dla"] = self.min_z_dlas[i].item()
+            spec["max_z_dla"] = self.max_z_dlas[i].item()
+            spec["snr"] = self.snrs[i].item()
+            spec["ra"] = ras[i].item()
+            spec["dec"] = decs[i].item()
+            spec["plate"] = self.plates[i].item()
+            spec["mjd"] = self.mjds[i].item()
+            spec["fiber_id"] = self.fiber_ids[i].item()
+            spec["thing_id"] = thing_id.item()
+            spec["z_qso"] = self.z_qsos[i].item()
+
+            dlas = []
+            tail_dlas = []
+
+            if num_dlas[i] > 0:
+                this_map_z_dlas = self.map_z_dlas[i, (num_dlas[i] - 1), : num_dlas[i]]
+                this_map_log_nhis = self.map_log_nhis[
+                    i, (num_dlas[i] - 1), : num_dlas[i]
+                ]
+
+                assert len(this_map_z_dlas) == num_dlas[i]
+
+                # append individual dlas
+                for j in range(num_dlas[i]):
+                    # move tail detection to another section
+                    if flag_tail_dlas and (this_map_z_dlas[j] < spec["min_z_dla"] + tail_zone):
+                        tail_dlas.append(
+                            {"log_nhi": this_map_log_nhis[j], "z_dla": this_map_z_dlas[j]}
+                        )
+                    else:
+                        dlas.append(
+                            {"log_nhi": this_map_log_nhis[j], "z_dla": this_map_z_dlas[j]}
+                        )
+
+            spec["dlas"] = dlas
+            if flag_tail_dlas:
+                spec["tail_dlas"] = tail_dlas
+
+            predictions_DLAs.append(spec)
+
+        import json
+
+        with open(outfile, "w") as json_file:
+            json.dump(predictions_DLAs, json_file, indent=2)
+
+        return predictions_DLAs
