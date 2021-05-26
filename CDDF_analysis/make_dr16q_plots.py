@@ -20,10 +20,11 @@ from .effective_optical_depth import effective_optical_depth
 cmap = cm.get_cmap("viridis")
 
 # change fontsize
-matplotlib.rcParams.update({"font.size": 14})
+matplotlib.rcParams.update(
+    {"font.size": 12, "axes.labelsize": 16, "axes.titlesize": 14}
+)
 
 # matplotlib.use('PDF')
-
 save_figure = lambda filename: plt.savefig(
     "{}.pdf".format(filename), format="pdf", dpi=300
 )
@@ -55,8 +56,8 @@ def do_procedure_plots(qsos_full_int: QSOLoader, qsos_original: QSOLoader):
     )
 
     ax.legend()
-    ax.set_xlabel(r"rest-wavelengths $\lambda_{\mathrm{rest}}$ $(\AA)$")
-    ax.set_ylabel(r"normalised flux")
+    ax.set_xlabel(r"Rest-frame Wavelength $(\AA)$")
+    ax.set_ylabel(r"Normalized Flux")
     ax.set_xlim([min_lambda, max_lambda])
 
     ax02 = ax.twiny()
@@ -93,8 +94,8 @@ def do_procedure_plots(qsos_full_int: QSOLoader, qsos_original: QSOLoader):
     )
 
     ax.legend()
-    ax.set_xlabel(r"rest-wavelengths $\lambda_{\mathrm{rest}}$ $\AA$")
-    ax.set_ylabel(r"normalised flux")
+    ax.set_xlabel(r"Rest-frame Wavelength $(\AA)$")
+    ax.set_ylabel(r"Normalized Flux")
     ax.set_xlim([min_lambda, max_lambda])
 
     ax12 = ax.twiny()
@@ -304,7 +305,7 @@ def do_dndx_occams(
     color_upper: str = "C1",
     color_lower: str = "C2",
     outfile: str = "dndx_gp_occams",
-    plot_gp: bool = True, 
+    plot_gp: bool = True,
 ):
     """
     Make dNdX plots with systematics from Occams razors.
@@ -319,7 +320,14 @@ def do_dndx_occams(
 
         dndx68 = np.full((N, 2), fill_value=np.nan)
         dndx95 = np.full((N, 2), fill_value=np.nan)
-        (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
+        (
+            z_cent,
+            dNdX,
+            dndx68[:, 0],
+            dndx68[:, 1],
+            dndx95[:, 0],
+            dndx95[:, 1],
+        ) = dndx_all
 
         plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C0")
 
@@ -331,7 +339,9 @@ def do_dndx_occams(
     dndx95 = np.full((N, 2), fill_value=np.nan)
     (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
-    plot_line_density(z_cent, dNdX, dndx68, dndx95, color=color_upper, label=label_upper)
+    plot_line_density(
+        z_cent, dNdX, dndx68, dndx95, color=color_upper, label=label_upper
+    )
 
     # Occams Lower
     dndx_all = np.loadtxt(os.path.join(subdir_occams_lower, "dndx_all.txt"))
@@ -341,7 +351,9 @@ def do_dndx_occams(
     dndx95 = np.full((N, 2), fill_value=np.nan)
     (z_cent, dNdX, dndx68[:, 0], dndx68[:, 1], dndx95[:, 0], dndx95[:, 1]) = dndx_all
 
-    plot_line_density(z_cent, dNdX, dndx68, dndx95, color=color_lower, label=label_lower)
+    plot_line_density(
+        z_cent, dNdX, dndx68, dndx95, color=color_lower, label=label_lower
+    )
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
     plt.tight_layout()
@@ -565,6 +577,8 @@ def do_Parks_CDDF(
     snr_thresh: float = -2.0,
     lyb: bool = False,
     search_range_from_ours: bool = False,
+    plot_gp: bool = True,
+    subdir_gp: str = "CDDF_analysis/dr16q_full_int_lyb_occam_zqso7_1_30_delta_z_0_1/",
 ):
     """
     Plot the column density function of Parks (2018)
@@ -587,6 +601,19 @@ def do_Parks_CDDF(
         label="CNN",
     )
     np.savetxt(os.path.join(subdir, "cddf_parks_all.txt"), (l_N, cddf))
+
+    # plot alongside with GP model
+    if plot_gp:
+        cddf_all = np.loadtxt(os.path.join(subdir_gp, "cddf_all.txt"))
+        (_, N) = cddf_all.shape
+
+        cddf68 = np.full((N, 2), fill_value=np.nan)
+        cddf95 = np.full((N, 2), fill_value=np.nan)
+        (l_N, cddf, cddf68[:, 0], cddf68[:, 1], cddf95[:, 0], cddf95[:, 1]) = cddf_all
+
+        plot_cddf(l_N, cddf, cddf68, cddf95)
+
+
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
@@ -668,6 +695,8 @@ def do_Parks_dNdX(
     snr_thresh: float = -2.0,
     lyb: bool = False,
     search_range_from_ours: bool = False,
+    plot_gp: bool = True,
+    subdir_gp: str = "CDDF_analysis/dr16q_full_int_lyb_occam_zqso7_1_30_delta_z_0_1/",
 ):
     """
     Plot dNdX for Parks' CNN model in the DR16Q
@@ -692,6 +721,24 @@ def do_Parks_dNdX(
     )
     np.savetxt(os.path.join(subdir, "dndx_all.txt"), (z_cent, dNdX))
 
+    # (z_cent, dNdX, dndx68[:,0],dndx68[:,1], dndx95[:,0],dndx95[:,1]) in (6, N) shape
+    if plot_gp:
+        dndx_all = np.loadtxt(os.path.join(subdir_gp, "dndx_all.txt"))
+        (_, N) = dndx_all.shape
+
+        dndx68 = np.full((N, 2), fill_value=np.nan)
+        dndx95 = np.full((N, 2), fill_value=np.nan)
+        (
+            z_cent,
+            dNdX,
+            dndx68[:, 0],
+            dndx68[:, 1],
+            dndx95[:, 0],
+            dndx95[:, 1],
+        ) = dndx_all
+
+        plot_line_density(z_cent, dNdX, dndx68, dndx95, color="C0")
+
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
     plt.tight_layout()
@@ -709,6 +756,8 @@ def do_Parks_OmegaDLA(
     snr_thresh: float = -2.0,
     lyb: bool = False,
     search_range_from_ours: bool = False,
+    plot_gp: bool = True,
+    subdir_gp: str = "CDDF_analysis/dr16q_full_int_lyb_occam_zqso7_1_30_delta_z_0_1/",
 ):
     """
     Plot OmegaDLA for Parks's CNN model in DR16Q
@@ -731,6 +780,25 @@ def do_Parks_OmegaDLA(
     )
 
     np.savetxt(os.path.join(subdir, "omega_dla_all.txt"), (z_cent, omega_dla))
+
+    # (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) in (6, N) shape
+    if plot_gp:
+        omega_dla_all = np.loadtxt(os.path.join(subdir_gp, "omega_dla_all.txt"))
+        (_, N) = omega_dla_all.shape
+
+        omega_dla_68 = np.full((N, 2), fill_value=np.nan)
+        omega_dla_95 = np.full((N, 2), fill_value=np.nan)
+        (
+            z_cent,
+            omega_dla,
+            omega_dla_68[:, 0],
+            omega_dla_68[:, 1],
+            omega_dla_95[:, 0],
+            omega_dla_95[:, 1],
+        ) = omega_dla_all
+
+        plot_omega_dla(z_cent, omega_dla, omega_dla_68, omega_dla_95, color="C0")
+
     plt.legend(loc=0)
     plt.xlim(2, 5)
     plt.ylim(0, 2.5)
@@ -1046,3 +1114,57 @@ def do_MAP_hist2d_parks(
         )
 
     save_figure("MAP_hist2d_GP_CNN")
+
+
+def do_plot_this_mu_with_labels(
+    nspec: int,
+    nspec_original: int,
+    qsos_dr16q: QSOLoaderDR16Q,
+    qsos_dr16q_original: QSOLoaderDR16Q,
+):
+    """
+    Plot this mu comparing between marginalising the meanflux uncertainty or without marginalising,
+    with shaded area on [Lyb, Lya]
+    """
+    qsos_dr16q.plot_this_mu(
+        nspec, new_fig=True, Parks=True, label="marginalizing meanflux: "
+    )
+    qsos_dr16q_original.plot_this_mu(
+        nspec_original,
+        new_fig=False,
+        label="without marginalizing meanflux: ",
+        color="C9",
+    )
+
+    rest_wavelengths = qsos_dr16q.GP.rest_wavelengths
+    min_rest_wavelength = (
+        (1 + qsos_dr16q.min_z_dlas[nspec])
+        * lya_wavelength
+        / (1 + qsos_dr16q.z_qsos[nspec])
+    )
+    max_rest_wavelength = (
+        (1 + qsos_dr16q.max_z_dlas[nspec])
+        * lya_wavelength
+        / (1 + qsos_dr16q.z_qsos[nspec])
+    )
+    ind = (rest_wavelengths > min_rest_wavelength) * (
+        rest_wavelengths < max_rest_wavelength
+    )
+
+    plt.fill_between(rest_wavelengths[ind], -1, 5, alpha=0.25, color="grey")
+
+    plt.ylim(-1, 5)
+    plt.title(
+        "thing ID = {}; z = {:.4g}, zPCA = {:.4g}, zPIPE = {:.4g}, zVI = {:.4g}; source_z = {}; CLASS_PERSON = {} (30: BALQSO, 50: Blazar)".format(
+            qsos_dr16q.thing_ids[nspec],
+            qsos_dr16q.z_qsos[nspec],
+            qsos_dr16q.hdu[1].data["Z_PCA"][qsos_dr16q.test_real_index][nspec],
+            qsos_dr16q.hdu[1].data["Z_PIPE"][qsos_dr16q.test_real_index][nspec],
+            qsos_dr16q.hdu[1].data["Z_VI"][qsos_dr16q.test_real_index][nspec],
+            qsos_dr16q.hdu[1].data["SOURCE_Z"][qsos_dr16q.test_real_index][nspec],
+            qsos_dr16q.hdu[1].data["CLASS_PERSON"][qsos_dr16q.test_real_index][nspec],
+        )
+    )
+    plt.tight_layout()
+    save_figure("this_mu_{}".format(qsos_dr16q.thing_ids[nspec]))
+    plt.show()
