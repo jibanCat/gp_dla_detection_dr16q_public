@@ -1659,6 +1659,7 @@ class QSOLoader(object):
             z_max=zmax,
             p_thresh=p_thresh,
             snr_thresh=snr_thresh,
+            **kwargs,
         )
 
         if moment:
