@@ -2427,7 +2427,7 @@ class QSOLoader(object):
             this_mu = this_mu * scale_factor
 
         plt.figure(figsize=(16, 5))
-        plt.plot(this_rest_wavelengths, this_flux, label=r"observed flux", color="C0")
+        plt.plot(this_rest_wavelengths, this_flux, label=r"normalized flux", color="C0")
         plt.plot(
             self.GP.rest_wavelengths,
             this_mu,
@@ -2579,7 +2579,7 @@ class QSOLoader(object):
             plt.plot(
                 this_rest_wavelengths,
                 this_flux,
-                label="observed flux; spec-{}-{}-{}".format(plate, mjd, fiber_id),
+                label="normalized flux; spec-{}-{}-{}".format(plate, mjd, fiber_id),
                 color="C0",
             )
 

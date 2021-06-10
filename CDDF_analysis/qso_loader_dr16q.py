@@ -786,7 +786,7 @@ class QSOLoaderDR16Q(QSOLoader):
             plt.plot(
                 this_rest_wavelengths,
                 this_flux,
-                label="observed flux; spec-{}-{}-{}".format(plate, mjd, fiber_id),
+                label="normalized flux; spec-{}-{}-{}".format(plate, mjd, fiber_id),
                 color="C0",
             )
 
