@@ -6,6 +6,18 @@ catalog reported in -->
 
 The code is derived from the DLA detection code reported in
 
+> M-F Ho, S Bird, and R Garnett. Damped Lyman-alpha Absorbers
+> from Sloan Digital Sky Survey DR16Q with Gaussian processes.
+> [arXiv:2103.10964 [astro-ph.GA]](https://arxiv.org/abs/2103.10964),
+
+including all intermediate data products including the Gaussian
+process null model described therein. The provided parameters should
+exactly reproduce the catalog in that work; however, you may feel free
+to modify these choices as you see fit.
+
+For the DR12 version, please go to this github repo
+([https://github.com/rmgarnett/gp_dla_detection/](https://github.com/rmgarnett/gp_dla_detection/))
+and the following two papers: 
 > R Garnett, S Ho, S Bird, and J Schnedier. Detecting Damped Lyman-α
 > Absorbers with Gaussian Processes. [arXiv:1605.04460
 > [astro-ph.CO]](https://arxiv.org/abs/1605.04460),
@@ -14,14 +26,10 @@ and
 
 > M-F Ho, S Bird, and R Garnett. Detecting Multiple DLAs per
 > Spectrum in SDSS DR12 with Gaussian Processes. [arXiv:2003.11036
-> [astro-ph.CO]](https://arxiv.org/abs/2003.11036),
+> [astro-ph.CO]](https://arxiv.org/abs/2003.11036).
 
-including all intermediate data products including the Gaussian
-process null model described therein. The provided parameters should
-exactly reproduce the catalog in that work; however, you may feel free
-to modify these choices as you see fit.
 
-The pipeline has multiple stages, outlined and documented below.
+The pipeline for GP DR16 DLAs has multiple stages, outlined and documented below.
 
 Loading catalogs and downloading spectra
 ----------------------------------------
