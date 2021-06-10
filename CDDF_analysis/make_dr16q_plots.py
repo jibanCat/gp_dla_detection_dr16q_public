@@ -1120,6 +1120,7 @@ def do_plot_this_mu_with_labels(
     nspec_original: int,
     qsos_dr16q: QSOLoaderDR16Q,
     qsos_dr16q_original: QSOLoaderDR16Q,
+    if_original: bool = True,
 ):
     """
     Plot this mu comparing between marginalising the meanflux uncertainty or without marginalising,
@@ -1128,12 +1129,13 @@ def do_plot_this_mu_with_labels(
     qsos_dr16q.plot_this_mu(
         nspec, new_fig=True, Parks=True, label="marginalizing meanflux: "
     )
-    qsos_dr16q_original.plot_this_mu(
-        nspec_original,
-        new_fig=False,
-        label="without marginalizing meanflux: ",
-        color="C9",
-    )
+    if if_original:
+        qsos_dr16q_original.plot_this_mu(
+            nspec_original,
+            new_fig=False,
+            label="without marginalizing meanflux: ",
+            color="C9",
+        )
 
     rest_wavelengths = qsos_dr16q.GP.rest_wavelengths
     min_rest_wavelength = (
