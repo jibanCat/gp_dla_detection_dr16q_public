@@ -14,12 +14,13 @@ from matplotlib import pyplot as plt
 import h5py
 
 from astropy.io import fits
+from numpy.lib.type_check import real_if_close
 
 from .set_parameters import *
 from .qso_loader import QSOLoader, GPLoader, conditional_mvnpdf_low_rank, make_fig
 from .voigt import Voigt_absorption
 from .effective_optical_depth import effective_optical_depth
-from .solene_dlas import solene_eBOSS_cuts
+from .solene_dlas import solene_eBOSS_cuts, bitget_string
 
 class QSOLoaderDR16Q(QSOLoader):
     def __init__(
@@ -506,6 +507,7 @@ class QSOLoaderDR16Q(QSOLoader):
             mjds = mjds[~ind_no_fitter]
             fiber_ids = fiber_ids[~ind_no_fitter]
             z_qsos = z_qsos[~ind_no_fitter]
+            thing_ids = thing_ids[~ind_no_fitter]
 
             dla_confidences = dla_confidences[~ind_no_fitter]
             z_dlas = z_dlas[~ind_no_fitter]
@@ -529,15 +531,42 @@ class QSOLoaderDR16Q(QSOLoader):
             self.hdu[1].data["ZWARNING"],
             self.hdu[1].data["BAL_PROB"],
         )
+        assert np.all([
+            bitget_string(format(z, "b"), bit) == False 
+            for bit in (0, 1, 7, 8, 9)
+            for z in self.hdu[1].data["ZWARNING"][ind_solene_los]
+        ])
         # DLA set should be a subset of LOS set
+        import pdb
+        pdb.set_trace()
         assert np.sum(~ind_solene_los & ind_solene_dla) == 0
         # 3) GP's line of sights
         if our_sightlines:
+            # awkward way to apply condition to test_ind 
             ind_gp_los = self.test_ind
+            real_index = np.where(self.test_ind)[0]
+            ind_gp_los[real_index[~self.condition]] = False
+            assert ind_gp_los.sum() == self.condition.sum()
+
             # only take the intersection of GP LOS and Solene LOS
             ind_solene_los = ind_solene_los & ind_gp_los
             # DLA sightlines should be a subset of solene LOS
             ind_solene_dla = ind_solene_dla & ind_gp_los
+
+            # in Solene's DLAs, only keep our sightlines
+            ind = np.isin(thing_ids, self.thing_ids)
+            ras = ras[ind]
+            decs = decs[ind]
+            plates = plates[ind]
+            fiber_ids = fiber_ids[ind]
+            z_qsos = z_qsos[ind]
+            thing_ids = thing_ids[ind]
+
+            dla_confidences = dla_confidences[ind]
+            z_dlas = z_dlas[ind]
+            log_nhis = log_nhis[ind]
+            log_nhis_fitter = log_nhis_fitter[ind]
+
         # 4) add (non-DLA detection) sightlines to Solene's catalog
         #    because the catalog did not have null detections.
         ind_add_los = ind_solene_los & (~ind_solene_dla)
@@ -608,6 +637,7 @@ class QSOLoaderDR16Q(QSOLoader):
 
         # avoid running it twice
         if solene_dlas:
+            print("[Info] Loading Solene's catalog")
             if "dict_solene" not in dir(self):
                 self.dict_solene = self.prediction_solene2dict(
                     dla_parks, our_sightlines=True, voigt_fitter=voigt_fitter,
@@ -617,8 +647,6 @@ class QSOLoaderDR16Q(QSOLoader):
 
             # assume log_nhis is overwritten by NHI_FIT
             if voigt_fitter:
-                import pdb
-                pdb.set_trace()
                 ind = np.isnan(cnn_catalog["log_nhis"])
                 assert np.all(cnn_catalog["log_nhis"][~ind] == cnn_catalog["log_nhis_fitter"][~ind])
 
@@ -646,6 +674,9 @@ class QSOLoaderDR16Q(QSOLoader):
         for i, thing_id in enumerate(thing_ids):
             real_index = np.where(self.thing_ids == thing_id)[0][0]
             all_snrs[i] = self.snrs[real_index]
+
+        import pdb
+        pdb.set_trace()
 
         # the searching range for the DLAs.
         if lyb:
@@ -748,15 +779,18 @@ class QSOLoaderDR16Q(QSOLoader):
         snrs = snrs[z_cut_inds]
         log_priors_dla = log_priors_dla[z_cut_inds]
 
-        self.dict_parks["cddf_thing_ids"] = thing_ids
-        self.dict_parks["cddf_log_nhis"] = log_nhis
-        self.dict_parks["cddf_z_dlas"] = z_dlas
-        self.dict_parks["min_z_dlas"] = min_z_dlas
-        self.dict_parks["max_z_dlas"] = max_z_dlas
-        self.dict_parks["snrs"] = snrs
-        self.dict_parks["all_snrs"] = all_snrs
-        self.dict_parks["cddf_p_dlas"] = p_dlas
-        self.dict_parks["p_thresh"] = p_thresh
+        self.cnn_catalog = {}
+
+        self.cnn_catalog["cddf_thing_ids"] = thing_ids
+        self.cnn_catalog["cddf_log_nhis"] = log_nhis
+        self.cnn_catalog["cddf_z_dlas"] = z_dlas
+        self.cnn_catalog["min_z_dlas"] = min_z_dlas
+        self.cnn_catalog["max_z_dlas"] = max_z_dlas
+        self.cnn_catalog["snrs"] = snrs
+        self.cnn_catalog["all_snrs"] = all_snrs
+        self.cnn_catalog["cddf_p_dlas"] = p_dlas
+        self.cnn_catalog["p_thresh"] = p_thresh
+        self.cnn_catalog["solene_dlas"] = solene_dlas
 
         return (
             thing_ids,
