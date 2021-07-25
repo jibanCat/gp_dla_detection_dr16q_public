@@ -45,7 +45,7 @@ def solene_eBOSS_cuts(z_qsos: int, zwarning: int, bal_prob: float) -> np.ndarray
         for b in solene_filter:
             fiter_yes = bitget_string(zw, b)
             if fiter_yes:
-                ind_z[i] = fiter_yes
+                ind_z[i] = False
                 break
 
     # 3) BAL prob
