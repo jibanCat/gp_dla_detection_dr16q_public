@@ -2,9 +2,12 @@
 QSOLoader for DR16Q GP catalogue
 """
 
+from json import dump
+from types import BuiltinFunctionType
 from typing import Dict, List, Tuple
 
 from collections import namedtuple, Counter
+from astropy.io.fits import hdu
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -16,6 +19,7 @@ from .set_parameters import *
 from .qso_loader import QSOLoader, GPLoader, conditional_mvnpdf_low_rank, make_fig
 from .voigt import Voigt_absorption
 from .effective_optical_depth import effective_optical_depth
+from .solene_dlas import solene_eBOSS_cuts
 
 class QSOLoaderDR16Q(QSOLoader):
     def __init__(
@@ -436,13 +440,150 @@ class QSOLoaderDR16Q(QSOLoader):
 
         return dict_parks
 
+    def prediction_solene2dict(self, dist_file: str, our_sightlines: bool = False, voigt_fitter: bool = False) -> Dict:
+        """
+        Get Solene's CNN predictions on DR16Q catalogue
+
+        TODO:
+        Need to load both NHI_CNN and NHI_FIT in order to plot CDDFs using different NHIs.
+        Need to get thingIDs from DR16Q and filtering using Solene's conditions (Given as follows).
+        This is due to Solene's catalogue only includes positive DLA detections, not negative detections.
+        But to calculate dX (total path length), sightlines with negative detections are required.
+
+        DLA_CAT_SDSS_DR16.fits (Chabanier+21)
+        *************************************************************************************
+        Results of the DLA search using the CNN from Parks+18 on the 263,201 QSO spectra from
+        the SDSS-IV quasar catalog from DR16 (Lyke+20) with 2 <= Z_QSO <= 6 and Z_WARNING !=
+        SKY, LITTLE_COVERAGE, UNPLUGGED, BAD_TARGET or NODATA.
+
+        The fits file contains an array of the 117,458 detected absorbers in sightlines with BAL_PROB =
+        0 and absorbing redshift Z_CNN >= 2.
+
+        Some additional information
+        Z_QSO: using Z_LYAWG
+        NHI_FIT: The logarithm of the absorber column density as found by the Voigt-profile fitter for
+            absorbers in the rest-frame range $1,040 \angstrom \leq \lambda_{\rm RF} \leq 1,216
+            \angstrom$ and $\log \nhi < 22$. This parameter is set to -1 for absorbers that do not
+            meet the criteria
+        Z_CNN: the absorber redshift as found by the CNN
+        NHI_CNN: the logarithm of the absorber column density as found by the CNN
+        CONF_CNN: confidence parameter, between 0 and 1. Absorbers with confidence > 0.5 are
+            considered as confident absorbers.
+        """
+        hdu_solene = fits.open(dist_file)
+
+        # extract DLA information: Solene's catalogue allows duplicate THING_IDs for
+        # multiple DLAs at the same sightline. We will need to append non-DLA sightline
+        # from DR16Q afterward.
+        ras = hdu_solene[1].data["RA"]
+        decs = hdu_solene[1].data["DEC"]
+        plates = hdu_solene[1].data["PLATE"]
+        mjds = hdu_solene[1].data["MJD"]
+        fiber_ids = hdu_solene[1].data["FIBERID"]
+        z_qsos = hdu_solene[1].data["Z_QSO"]
+        thing_ids = hdu_solene[1].data["THING_ID"]
+
+        dla_confidences = hdu_solene[1].data["CONF_CNN"]
+        z_dlas = hdu_solene[1].data["Z_CNN"]
+        log_nhis = hdu_solene[1].data["NHI_CNN"]
+        log_nhis_fitter = hdu_solene[1].data["NHI_FIT"]
+
+        assert np.all(dla_confidences >= 0)
+        assert np.all(dla_confidences <= 1)
+        assert np.all(log_nhis >= 19.5)
+        assert np.all(z_dlas >= 2)
+
+        # TODO: Check again here if results are not sensible. Not sure if -1 DLAs are
+        #   considered to be null detections.
+        #   Use Voigt fitter as NHI: only a subset of DLAs has applied Voigt fit
+        #   DLAs do not fit the fitting criteria as set with -1
+        if voigt_fitter:
+            ind_no_fitter = (log_nhis_fitter == -1)
+
+            ras = ras[~ind_no_fitter]
+            decs = decs[~ind_no_fitter]
+            plates = plates[~ind_no_fitter]
+            mjds = mjds[~ind_no_fitter]
+            fiber_ids = fiber_ids[~ind_no_fitter]
+            z_qsos = z_qsos[~ind_no_fitter]
+
+            dla_confidences = dla_confidences[~ind_no_fitter]
+            z_dlas = z_dlas[~ind_no_fitter]
+            # log_nhis = log_nhis[~ind_no_fitter] # keep the CNN one for future comparison
+            log_nhis_fitter = log_nhis_fitter[~ind_no_fitter]
+
+            log_nhis = log_nhis_fitter
+
+            assert np.all( log_nhis_fitter >= 19.3 ) # strangely the min of fitter is ~19.3
+
+        # only append the thingIDs that are not in Solene's DLAs
+        # 1) search Solene's DLA thingIDs in DR16Q
+        # ind_solene_dla = np.isin(self.hdu[1].data["THING_ID"], thing_ids)
+        # not using thingID because -1 duplicated
+        unique_ids_dr16q = self.make_unique_id(self.hdu[1].data["PLATE"], self.hdu[1].data["MJD"], self.hdu[1].data["FIBERID"])
+        unique_ids_solene_dlas = self.make_unique_id(plates, mjds, fiber_ids)
+        ind_solene_dla = np.isin(unique_ids_dr16q, unique_ids_solene_dlas)
+        # 2) DR16 sightlines with filtering condition set by Solene
+        ind_solene_los = solene_eBOSS_cuts(
+            self.hdu[1].data["Z_LYAWG"],
+            self.hdu[1].data["ZWARNING"],
+            self.hdu[1].data["BAL_PROB"],
+        )
+        # DLA set should be a subset of LOS set
+        assert np.sum(~ind_solene_los & ind_solene_dla) == 0
+        # 3) GP's line of sights
+        if our_sightlines:
+            ind_gp_los = self.test_ind
+            # only take the intersection of GP LOS and Solene LOS
+            ind_solene_los = ind_solene_los & ind_gp_los
+            # DLA sightlines should be a subset of solene LOS
+            ind_solene_dla = ind_solene_dla & ind_gp_los
+        # 4) add (non-DLA detection) sightlines to Solene's catalog
+        #    because the catalog did not have null detections.
+        ind_add_los = ind_solene_los & (~ind_solene_dla)
+
+        ras = np.append(ras, self.hdu[1].data["RA"][ind_add_los])
+        decs = np.append(decs, self.hdu[1].data["DEC"][ind_add_los])
+        plates = np.append(plates, self.hdu[1].data["PLATE"][ind_add_los])
+        mjds = np.append(mjds, self.hdu[1].data["MJD"][ind_add_los])
+        fiber_ids = np.append(fiber_ids, self.hdu[1].data["FIBERID"][ind_add_los])
+        z_qsos = np.append(z_qsos, self.hdu[1].data["Z_LYAWG"][ind_add_los])
+        thing_ids = np.append(thing_ids, self.hdu[1].data["THING_ID"][ind_add_los])
+        # append NaNs for LOS (non-detections)
+        dla_confidences = np.append(dla_confidences, np.full((np.sum(ind_add_los), ), fill_value=np.nan))
+        z_dlas = np.append(z_dlas, np.full((np.sum(ind_add_los), ), fill_value=np.nan))
+        log_nhis = np.append(log_nhis, np.full((np.sum(ind_add_los), ), fill_value=np.nan))
+        log_nhis_fitter = np.append(log_nhis_fitter, np.full((np.sum(ind_add_los), ), fill_value=np.nan))
+
+        assert np.all(z_qsos >= 2)
+
+
+        dict_solene = {
+            "thing_ids": thing_ids.astype(np.int),
+            "ras": ras,
+            "decs": decs,
+            "plates": plates.astype(np.int),
+            "mjds": mjds.astype(np.int),
+            "fiber_ids": fiber_ids.astype(np.int),
+            "z_qso": z_qsos,
+            "dla_confidences": dla_confidences,
+            "z_dlas": z_dlas,
+            "log_nhis": log_nhis,
+            "log_nhis_fitter": log_nhis_fitter,
+        }
+
+        return dict_solene
+
+
     def _get_parks_estimations(
         self,
-        dla_parks: str = "DR16Q_v4.fits",
+        dla_parks: str = "DR16Q_v4.fits", # DLA_CAT_SDSS_DR16.fits (Solene's catalog)
         p_thresh: float = 0.97,
         lyb: bool = False,
         prior: bool = False,
         search_range_from_ours: bool = False,
+        solene_dlas: bool = False,
+        voigt_fitter: bool = False,
     ) -> Tuple[
         np.ndarray,
         np.ndarray,
@@ -454,45 +595,45 @@ class QSOLoaderDR16Q(QSOLoader):
         np.ndarray,
     ]:
         """
-        Get z_dlas and log_nhis from Parks' (2018) estimations
+        Get z_dlas and log_nhis from Parks' (2018) or Solene's (2021) estimations
         """
         # make sure we are reading the DR16Q file
-        assert dla_parks in self.dist_file
+        # assert dla_parks in self.dist_file
 
-        if "dict_parks" not in dir(self):
-            self.dict_parks = self.prediction_parks2dict(
-                self.dist_file, selected_thing_ids=self.thing_ids
-            )
+        # voigt fitter only works for Solene's catalog
+        # also, the search range is 1040 ~ 1216
+        if voigt_fitter:
+            assert solene_dlas
+            assert (search_range_from_ours | lyb)
 
-        if "p_thresh" in self.dict_parks.keys():
-            if self.dict_parks["p_thresh"] == p_thresh:
-                thing_ids = self.dict_parks["cddf_thing_ids"]
-                log_nhis = self.dict_parks["cddf_log_nhis"]
-                z_dlas = self.dict_parks["cddf_z_dlas"]
-                min_z_dlas = self.dict_parks["min_z_dlas"]
-                max_z_dlas = self.dict_parks["max_z_dlas"]
-                snrs = self.dict_parks["snrs"]
-                all_snrs = self.dict_parks["all_snrs"]
-                p_dlas = self.dict_parks["cddf_p_dlas"]
-                p_thresh = self.dict_parks["p_thresh"]
-
-                return (
-                    thing_ids,
-                    log_nhis,
-                    z_dlas,
-                    min_z_dlas,
-                    max_z_dlas,
-                    snrs,
-                    all_snrs,
-                    p_dlas,
+        # avoid running it twice
+        if solene_dlas:
+            if "dict_solene" not in dir(self):
+                self.dict_solene = self.prediction_solene2dict(
+                    dla_parks, our_sightlines=True, voigt_fitter=voigt_fitter,
                 )
 
-        dict_parks = self.dict_parks
+            cnn_catalog = self.dict_solene
+
+            # assume log_nhis is overwritten by NHI_FIT
+            if voigt_fitter:
+                import pdb
+                pdb.set_trace()
+                ind = np.isnan(cnn_catalog["log_nhis"])
+                assert np.all(cnn_catalog["log_nhis"][~ind] == cnn_catalog["log_nhis_fitter"][~ind])
+
+        else:
+            if "dict_parks" not in dir(self):
+                self.dict_parks = self.prediction_parks2dict(
+                    dla_parks, selected_thing_ids=self.thing_ids
+                )
+
+            cnn_catalog = self.dict_parks
 
         # use thing_ids as an identifier
         # use zPCA as zQSOs, as said in DR16Q paper
-        thing_ids = dict_parks["thing_ids"]
-        z_qsos = dict_parks["z_qso"]
+        thing_ids = cnn_catalog["thing_ids"]
+        z_qsos = cnn_catalog["z_qso"]
 
         # fixed range of the sightline ranging from 911A-1215A in rest-frame
         # we should include all sightlines in the dataset
@@ -531,15 +672,15 @@ class QSOLoaderDR16Q(QSOLoader):
         # get DLA properties
         # note: the following indices are DLA-only
         dla_inds = (
-            dict_parks["dla_confidences"] > 0.005
+            cnn_catalog["dla_confidences"] > 0.005
         )  # use p_thresh=0.005 to filter out non-DLA spectra and
         # speed up the computation
 
         thing_ids = thing_ids[dla_inds]
-        log_nhis = dict_parks["log_nhis"][dla_inds]
-        z_dlas = dict_parks["z_dlas"][dla_inds]
-        z_qsos = dict_parks["z_qso"][dla_inds]
-        p_dlas = dict_parks["dla_confidences"][dla_inds]
+        log_nhis = cnn_catalog["log_nhis"][dla_inds]
+        z_dlas = cnn_catalog["z_dlas"][dla_inds]
+        z_qsos = cnn_catalog["z_qso"][dla_inds]
+        p_dlas = cnn_catalog["dla_confidences"][dla_inds]
 
         # for loop to get snrs from sbird's snrs file
         # Note arrays here are for DLA only
