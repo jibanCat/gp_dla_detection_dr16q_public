@@ -917,6 +917,9 @@ class QSOLoader(object):
 
     @staticmethod
     def make_unique_id(plates, mjds, fiber_ids):
+        plates = np.int64(plates)
+        mjds = np.int64(mjds)
+        fiber_ids = np.int64(fiber_ids)
         return plates * 10 ** 9 + mjds * 10 ** 4 + fiber_ids
 
     def make_multi_unique_id(self, num_dla, plates, mjds, fiber_ids):
