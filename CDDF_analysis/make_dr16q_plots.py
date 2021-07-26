@@ -1236,3 +1236,43 @@ def do_plot_this_mu_with_labels(
     plt.tight_layout()
     save_figure("this_mu_{}".format(qsos_dr16q.thing_ids[nspec]))
     plt.show()
+
+def plot_this_mu_overlapping_dlas(qsos: QSOLoaderDR16Q, Parks: bool = True, Solene: bool = True):
+    """
+    Plot the comparison of Parks, Solene, ours on spectra with solid DLA detections
+    but overlapping/nearby DLAs.
+    """
+    selected_thing_ids = [
+        147946665,
+        177872172,
+        194921144,
+        209755715,
+        225460412,
+        229232104,
+        236392107,
+        248088771,
+        268065713,
+        269549832,
+        296660604,
+        307451922,
+        332071702,
+        349105103,
+        371695814,
+        37208460,
+        416180602,
+        473203069,
+        487498804,
+        488562798,
+        501293410,
+        540640951,
+        54806980,
+        60605850,
+    ]
+
+    all_specs = np.where(np.isin(qsos.thing_ids, selected_thing_ids))[0]
+
+    for nspec in all_specs:
+        qsos.plot_this_mu(nspec, Parks=Parks, Solene=Solene, voigt_fitter=False, dla_solene="data/dr16q/distfiles/DLA_CAT_SDSS_DR16.fits")
+        plt.ylim(-1, 5)
+        save_figure("plot_specs/CNN_overlaps/this_mu_{}".format(qsos.thing_ids[nspec]))
+        plt.show()
