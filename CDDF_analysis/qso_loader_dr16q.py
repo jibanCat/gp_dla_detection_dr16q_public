@@ -559,6 +559,7 @@ class QSOLoaderDR16Q(QSOLoader):
             ras = ras[ind]
             decs = decs[ind]
             plates = plates[ind]
+            mjds = mjds[ind]
             fiber_ids = fiber_ids[ind]
             z_qsos = z_qsos[ind]
             thing_ids = thing_ids[ind]
@@ -808,6 +809,9 @@ class QSOLoaderDR16Q(QSOLoader):
         num_voigt_lines: int = 3,
         num_forest_lines: int = 31,
         Parks: bool = False,
+        Solene: bool = False,
+        voigt_fitter: bool = False, # only for Solene == True
+        dla_solene: str = "DLA_CAT_SDSS_DR16.fits",
         label:str = "",
         new_fig: bool = True,
         color: str = "red",
@@ -825,7 +829,8 @@ class QSOLoaderDR16Q(QSOLoader):
         num_voigt_lines (int, min=1, max=31) : how many members of Lyman series in the DLA Voigt profile
         number_forest_lines (int) : how many members of Lymans series considered in the froest
         Parks (bool) : whether to plot Parks' results
-        dla_parks (str) : if Parks=True, specify the path to Parks' `prediction_DR12.json`
+        Solene (bool) : whether to plot Solene's results
+        dla_solene (str) : if Solene=True, specify the path to Solene' `DLA_CAT_SDSS_DR16.fits`
 
         Returns:
         ----
@@ -834,6 +839,9 @@ class QSOLoaderDR16Q(QSOLoader):
         map_z_dlas : MAP z_dla values
         map_log_nhis : MAP log NHI values
         """
+        if voigt_fitter:
+            assert Solene
+
         # spec id
         plate, mjd, fiber_id = (
             self.plates[nspec],
@@ -929,29 +937,75 @@ class QSOLoaderDR16Q(QSOLoader):
             uids = np.where(unique_ids == self.unique_ids[nspec])[0]
 
             this_parks_mu = this_mu_original
-            dla_confidences = []
-            z_dlas = []
-            log_nhis = []
+            dla_confidences_parks = []
+            z_dlas_parks = []
+            log_nhis_parks = []
 
             for uid in uids:
-                z_dla = dict_parks["z_dlas"][uid]
-                log_nhi = dict_parks["log_nhis"][uid]
+                z_dla_parks = dict_parks["z_dlas"][uid]
+                log_nhi_parks = dict_parks["log_nhis"][uid]
+                dla_confidence_parks = dict_parks["dla_confidences"][uid]
 
-                dla_confidences.append(dict_parks["dla_confidences"][uid])
-                z_dlas.append(z_dla)
-                log_nhis.append(log_nhi)
+                dla_confidences_parks.append(dla_confidence_parks)
+                z_dlas_parks.append(z_dla_parks)
+                log_nhis_parks.append(log_nhi_parks)
 
                 if np.any(np.isnan(dict_parks["dla_confidences"][uid])):
                     continue
 
                 absorption = Voigt_absorption(
                     rest_wavelengths * (1 + self.z_qsos[nspec]),
-                    10 ** log_nhi,
-                    z_dla,
+                    10 ** log_nhi_parks,
+                    z_dla_parks,
                     num_lines=1,
                 )
 
                 this_parks_mu = this_parks_mu * absorption
+
+        # get Solene model
+        if Solene:
+            if not "dict_solene" in dir(self):
+                self.dict_solene = self.prediction_solene2dict(dla_solene, our_sightlines=True, voigt_fitter=voigt_fitter)
+
+            dict_solene = self.dict_solene
+
+            # construct an array of unique ids for los
+            self.unique_ids = self.make_unique_id(
+                self.plates, self.mjds, self.fiber_ids
+            )
+            unique_ids = self.make_unique_id(
+                dict_solene["plates"], dict_solene["mjds"], dict_solene["fiber_ids"]
+            )
+            assert unique_ids.dtype is np.dtype("int64")
+            assert self.unique_ids.dtype is np.dtype("int64")
+
+            uids = np.where(unique_ids == self.unique_ids[nspec])[0]
+
+            this_solene_mu = this_mu_original
+            dla_confidences_solene = []
+            z_dlas_solene = []
+            log_nhis_solene = []
+
+            for uid in uids:
+                z_dla_solene = dict_solene["z_dlas"][uid]
+                log_nhi_solene = dict_solene["log_nhis"][uid]
+                dla_confidence_solene = dict_solene["dla_confidences"][uid]
+
+                dla_confidences_solene.append(dla_confidence_solene)
+                z_dlas_solene.append(z_dla_solene)
+                log_nhis_solene.append(log_nhi_solene)
+
+                if np.any(np.isnan(dict_solene["dla_confidences"][uid])):
+                    continue
+
+                absorption = Voigt_absorption(
+                    rest_wavelengths * (1 + self.z_qsos[nspec]),
+                    10 ** log_nhi_solene,
+                    z_dla_solene,
+                    num_lines=1,
+                )
+
+                this_solene_mu = this_solene_mu * absorption
 
         # plt.figure(figsize=(16, 5))
         if new_fig:
@@ -968,12 +1022,25 @@ class QSOLoaderDR16Q(QSOLoader):
                 rest_wavelengths,
                 this_parks_mu,
                 label=r"CNN: z_dlas = ({}); lognhis=({}); p_dlas=({})".format(
-                    ",".join("{:.3g}".format(z) for z in z_dlas),
-                    ",".join("{:.3g}".format(n) for n in log_nhis),
-                    ",".join("{:.3g}".format(p) for p in dla_confidences),
+                    ",".join("{:.3g}".format(z) for z in z_dlas_parks),
+                    ",".join("{:.3g}".format(n) for n in log_nhis_parks),
+                    ",".join("{:.3g}".format(p) for p in dla_confidences_parks),
                 ),
                 color="orange",
             )
+
+        if Solene:
+            plt.plot(
+                rest_wavelengths,
+                this_solene_mu,
+                label=r"Solene: z_dlas = ({}); lognhis=({}); p_dlas=({})".format(
+                    ",".join("{:.3g}".format(z) for z in z_dlas_solene),
+                    ",".join("{:.3g}".format(n) for n in log_nhis_solene),
+                    ",".join("{:.3g}".format(p) for p in dla_confidences_solene),
+                ),
+                color="magenta",
+            )
+
         if nth >= 0:
             plt.plot(
                 rest_wavelengths,
@@ -984,8 +1051,11 @@ class QSOLoaderDR16Q(QSOLoader):
                 + ": {:.3g}; ".format(
                     self.model_posteriors[nspec, 1 + self.sub_dla + nth]
                 )
-                + "lognhi = ({})".format(
+                + "lognhi = ({}); ".format(
                     ",".join("{:.3g}".format(n) for n in map_log_nhis)
+                )
+                + "z_dlas = ({})".format(
+                    ",".join("{:.3g}".format(z) for z in map_z_dlas)
                 ),
                 color=color,
             )
