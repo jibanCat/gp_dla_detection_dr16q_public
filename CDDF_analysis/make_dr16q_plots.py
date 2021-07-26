@@ -2,6 +2,7 @@
 Make plots for the Multi-DLA paper
 """
 import os
+import pathlib
 import numpy as np
 from scipy.stats import pearsonr
 from scipy.interpolate import interp1d
@@ -571,36 +572,55 @@ def plot_omega_dla(
 
 def do_Parks_CDDF(
     qsos: QSOLoaderDR16Q,
-    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
-    subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
+    dla_cnn: str = "data/dr16q/distfiles/DR16Q_v4.fits", # "data/dr16q/distfiles/DLA_CAT_SDSS_DR16.fits"
+    subdir: str = "CDDF_analysis/parks_cddf_dr16q/", # CDDF_analysis/solene_cddf_dr16q
     p_thresh: float = 0.98,
     snr_thresh: float = -2.0,
+    solene_dlas: bool = False, # Solene only
+    voigt_fitter: bool = False, # Solene only
+    our_sightlines: bool = True, # Solene only
     lyb: bool = False,
+    min_1040: bool = False,
     search_range_from_ours: bool = False,
     plot_gp: bool = True,
     subdir_gp: str = "CDDF_analysis/dr16q_full_int_lyb_occam_zqso7_1_30_delta_z_0_1/",
 ):
     """
-    Plot the column density function of Parks (2018)
+    Plot the column density function of Parks (2018) or Solene (2021)
 
     Parameters:
     ----
-    dla_parks (str) : path to Parks' CNN model in the DR16Q
+    dla_cnn (str) : path to Parks' CNN model in the DR16Q
     """
+
+    pathlib.Path(subdir).mkdir(parents=True, exist_ok=True)
+
     dla_data.noterdaeme_12_data()
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks,
+        dla_cnn,
         zmax=5,
         color="C4",
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         apply_p_dlas=False,
-        prior=False,
         lyb=lyb,
+        min_1040=min_1040,
         search_range_from_ours=search_range_from_ours,
         label="CNN",
+        solene_dlas=solene_dlas,
+        voigt_fitter=voigt_fitter,
+        our_sightlines=our_sightlines,
     )
-    np.savetxt(os.path.join(subdir, "cddf_parks_all.txt"), (l_N, cddf))
+
+    # set the specialized figure names, and double check the args
+    if solene_dlas:
+        assert "dict_solene" in dir(qsos)
+        figname = "solene"
+    else:
+        assert ~voigt_fitter
+        figname = "parks"
+
+    np.savetxt(os.path.join(subdir, "cddf_{}_all.txt".format(figname)), (l_N, cddf))
 
     # plot alongside with GP model
     if plot_gp:
@@ -617,12 +637,12 @@ def do_Parks_CDDF(
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
     plt.tight_layout()
-    save_figure(os.path.join(subdir, "cddf_parks"))
+    save_figure(os.path.join(subdir, "cddf_{}".format(figname)))
     plt.clf()
 
     # Evolution with redshift
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks,
+        dla_cnn,
         zmin=4,
         zmax=5,
         label="4-5",
@@ -630,13 +650,16 @@ def do_Parks_CDDF(
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         apply_p_dlas=False,
-        prior=False,
         lyb=lyb,
+        min_1040=min_1040,
         search_range_from_ours=search_range_from_ours,
+        solene_dlas=solene_dlas,
+        voigt_fitter=voigt_fitter,
+        our_sightlines=our_sightlines,
     )
-    np.savetxt(os.path.join(subdir, "cddf_parks_z45.txt"), (l_N, cddf))
+    np.savetxt(os.path.join(subdir, "cddf_{}_z45.txt".format(figname)), (l_N, cddf))
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks,
+        dla_cnn,
         zmin=3,
         zmax=4,
         label="3-4",
@@ -644,13 +667,16 @@ def do_Parks_CDDF(
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         apply_p_dlas=False,
-        prior=False,
         lyb=lyb,
+        min_1040=min_1040,
         search_range_from_ours=search_range_from_ours,
+        solene_dlas=solene_dlas,
+        voigt_fitter=voigt_fitter,
+        our_sightlines=our_sightlines,
     )
-    np.savetxt(os.path.join(subdir, "cddf_parks_z34.txt"), (l_N, cddf))
+    np.savetxt(os.path.join(subdir, "cddf_{}_z34.txt".format(figname)), (l_N, cddf))
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks,
+        dla_cnn,
         zmin=2.5,
         zmax=3,
         label="2.5-3",
@@ -658,13 +684,16 @@ def do_Parks_CDDF(
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         apply_p_dlas=False,
-        prior=False,
         lyb=lyb,
+        min_1040=min_1040,
         search_range_from_ours=search_range_from_ours,
+        solene_dlas=solene_dlas,
+        voigt_fitter=voigt_fitter,
+        our_sightlines=our_sightlines,
     )
-    np.savetxt(os.path.join(subdir, "cddf_parks_z253.txt"), (l_N, cddf))
+    np.savetxt(os.path.join(subdir, "cddf_{}_z253.txt".format(figname)), (l_N, cddf))
     (l_N, cddf) = qsos.plot_cddf_parks(
-        dla_parks,
+        dla_cnn,
         zmin=2,
         zmax=2.5,
         label="2-2.5",
@@ -672,27 +701,34 @@ def do_Parks_CDDF(
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         apply_p_dlas=False,
-        prior=False,
         lyb=lyb,
+        min_1040=min_1040,
         search_range_from_ours=search_range_from_ours,
+        solene_dlas=solene_dlas,
+        voigt_fitter=voigt_fitter,
+        our_sightlines=our_sightlines,
     )
-    np.savetxt(os.path.join(subdir, "cddf_parks_z225.txt"), (l_N, cddf))
+    np.savetxt(os.path.join(subdir, "cddf_{}_z225.txt".format(figname)), (l_N, cddf))
 
     plt.xlim(1e20, 1e23)
     plt.ylim(1e-28, 5e-21)
     plt.legend(loc=0)
     plt.tight_layout()
-    save_figure(os.path.join(subdir, "cddf_zz_parks"))
+    save_figure(os.path.join(subdir, "cddf_zz_{}".format(figname)))
     plt.clf()
 
 
 def do_Parks_dNdX(
     qsos: QSOLoaderDR16Q,
-    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
-    subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
+    dla_cnn: str = "data/dr16q/distfiles/DR16Q_v4.fits", # "data/dr16q/distfiles/DLA_CAT_SDSS_DR16.fits"
+    subdir: str = "CDDF_analysis/parks_cddf_dr16q/", # CDDF_analysis/solene_cddf_dr16q
     p_thresh: float = 0.98,
     snr_thresh: float = -2.0,
+    solene_dlas: bool = False, # Solene only
+    voigt_fitter: bool = False, # Solene only
+    our_sightlines: bool = True, # Solene only
     lyb: bool = False,
+    min_1040: bool = False,
     search_range_from_ours: bool = False,
     plot_gp: bool = True,
     subdir_gp: str = "CDDF_analysis/dr16q_full_int_lyb_occam_zqso7_1_30_delta_z_0_1/",
@@ -702,23 +738,37 @@ def do_Parks_dNdX(
 
     Parameters:
     ----
-    dla_parks (str) : path to Parks' CNN model in the DR16Q
+    dla_cnn (str) : path to Parks' CNN model in the DR16Q
     """
+
+    pathlib.Path(subdir).mkdir(parents=True, exist_ok=True)
+
     dla_data.dndx_not()
     dla_data.dndx_pro()
     z_cent, dNdX = qsos.plot_line_density_park(
-        dla_parks,
+        dla_cnn,
         zmax=5,
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         apply_p_dlas=False,
-        prior=False,
         lyb=lyb,
+        min_1040=min_1040,
         search_range_from_ours=search_range_from_ours,
         color="C4",
         label="CNN",
+        solene_dlas=solene_dlas,
+        voigt_fitter=voigt_fitter,
+        our_sightlines=our_sightlines,
     )
     np.savetxt(os.path.join(subdir, "dndx_all.txt"), (z_cent, dNdX))
+
+    # set the specialized figure names, and double check the args
+    if solene_dlas:
+        assert "dict_solene" in dir(qsos)
+        figname = "solene"
+    else:
+        assert ~voigt_fitter
+        figname = "parks"
 
     # (z_cent, dNdX, dndx68[:,0],dndx68[:,1], dndx95[:,0],dndx95[:,1]) in (6, N) shape
     if plot_gp:
@@ -741,19 +791,23 @@ def do_Parks_dNdX(
     plt.legend(loc=0)
     plt.ylim(0, 0.16)
     plt.tight_layout()
-    save_figure(os.path.join(subdir, "dndx_parks"))
+    save_figure(os.path.join(subdir, "dndx_{}".format(figname)))
     plt.clf()
 
 
 def do_Parks_OmegaDLA(
     qsos: QSOLoaderDR16Q,
-    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
-    subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
+    dla_cnn: str = "data/dr16q/distfiles/DR16Q_v4.fits", # "data/dr16q/distfiles/DLA_CAT_SDSS_DR16.fits"
+    subdir: str = "CDDF_analysis/parks_cddf_dr16q/", # CDDF_analysis/solene_cddf_dr16q
     zmin: float = 2.0,
     zmax: float = 4.0,
     p_thresh: float = 0.98,
     snr_thresh: float = -2.0,
+    solene_dlas: bool = False, # Solene only
+    voigt_fitter: bool = False, # Solene only
+    our_sightlines: bool = True, # Solene only
     lyb: bool = False,
+    min_1040: bool = False,
     search_range_from_ours: bool = False,
     plot_gp: bool = True,
     subdir_gp: str = "CDDF_analysis/dr16q_full_int_lyb_occam_zqso7_1_30_delta_z_0_1/",
@@ -761,24 +815,39 @@ def do_Parks_OmegaDLA(
     """
     Plot OmegaDLA for Parks's CNN model in DR16Q
     """
+
+    pathlib.Path(subdir).mkdir(parents=True, exist_ok=True)
+
     # Omega_DLA
     dla_data.omegahi_not()
     dla_data.omegahi_pro()
     dla_data.crighton_omega()
 
     (z_cent, omega_dla) = qsos.plot_omega_dla_parks(
-        dla_parks,
+        dla_cnn,
         zmin=zmin,
         zmax=zmax,
         p_thresh=p_thresh,
         snr_thresh=snr_thresh,
         lyb=lyb,
+        min_1040=min_1040,
         search_range_from_ours=search_range_from_ours,
         color="C4",
         label="CNN",
+        solene_dlas=solene_dlas,
+        voigt_fitter=voigt_fitter,
+        our_sightlines=our_sightlines,
     )
 
     np.savetxt(os.path.join(subdir, "omega_dla_all.txt"), (z_cent, omega_dla))
+
+    # set the specialized figure names, and double check the args
+    if solene_dlas:
+        assert "dict_solene" in dir(qsos)
+        figname = "solene"
+    else:
+        assert ~voigt_fitter
+        figname = "parks"
 
     # (z_cent, omega_dla, omega_dla_68[:,0],omega_dla_68[:,1], omega_dla_95[:,0], omega_dla_95[:,1]) in (6, N) shape
     if plot_gp:
@@ -802,13 +871,13 @@ def do_Parks_OmegaDLA(
     plt.xlim(2, 5)
     plt.ylim(0, 2.5)
     plt.tight_layout()
-    save_figure(os.path.join(subdir, "omega_parks"))
+    save_figure(os.path.join(subdir, "omega_{}".format(figname)))
     plt.clf()
 
 
 def do_Parks_snr_check(
     qsos: QSOLoaderDR16Q,
-    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    dla_cnn: str = "data/dr16q/distfiles/DR16Q_v4.fits",
     subdir: str = "CDDF_analysis/parks_cddf_dr16q/",
     p_thresh: float = 0.98,
     lyb: bool = False,
@@ -823,14 +892,13 @@ def do_Parks_snr_check(
     dla_data.noterdaeme_12_data()
     for i, snr_thresh in enumerate(snrs_list):
         (l_N, cddf) = qsos.plot_cddf_parks(
-            dla_parks,
+            dla_cnn,
             zmax=5,
             p_thresh=p_thresh,
             color=cmap((i + 1) / len(snrs_list)),
             snr_thresh=snr_thresh,
             label="Parks SNR > {:d}".format(snr_thresh),
             apply_p_dlas=False,
-            prior=False,
             lyb=lyb,
             search_range_from_ours=search_range_from_ours,
         )
@@ -846,14 +914,13 @@ def do_Parks_snr_check(
     dla_data.dndx_pro()
     for i, snr_thresh in enumerate(snrs_list):
         z_cent, dNdX = qsos.plot_line_density_park(
-            dla_parks,
+            dla_cnn,
             zmax=5,
             p_thresh=p_thresh,
             color=cmap((i + 1) / len(snrs_list)),
             snr_thresh=snr_thresh,
             label="Parks SNR > {:d}".format(snr_thresh),
             apply_p_dlas=False,
-            prior=False,
             lyb=lyb,
             search_range_from_ours=search_range_from_ours,
         )
@@ -866,7 +933,7 @@ def do_Parks_snr_check(
 
 def do_confusion_parks(
     qsos: QSOLoaderDR16Q,
-    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    dla_cnn: str = "data/dr16q/distfiles/DR16Q_v4.fits",
     snr: float = -1.0,
     dla_confidence: float = 0.98,
     p_thresh: float = 0.98,
@@ -877,7 +944,7 @@ def do_confusion_parks(
     """
     if "dla_catalog_parks" not in dir(qsos):
         qsos.load_dla_parks(
-            dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1
+            dla_cnn, p_thresh=dla_confidence, multi_dla=False, num_dla=1
         )
 
     confusion_matrix, _ = qsos.make_multi_confusion(
@@ -910,7 +977,7 @@ def do_confusion_parks(
 
 def do_MAP_parks_comparison(
     qsos: QSOLoaderDR16Q,
-    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    dla_cnn: str = "data/dr16q/distfiles/DR16Q_v4.fits",
     dla_confidence: float = 0.98,
     num_dlas: int = 1,
     num_bins: int = 100,
@@ -920,7 +987,7 @@ def do_MAP_parks_comparison(
     """
     if "dla_catalog_parks" not in dir(qsos):
         qsos.load_dla_parks(
-            dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1
+            dla_cnn, p_thresh=dla_confidence, multi_dla=False, num_dla=1
         )
 
     Delta_z_dlas, Delta_log_nhis, z_dlas_parks = qsos.make_MAP_parks_comparison(
@@ -1024,7 +1091,7 @@ def do_MAP_parks_comparison(
 
 def do_MAP_hist2d_parks(
     qsos: QSOLoaderDR16Q,
-    dla_parks: str = "data/dr16q/distfiles/DR16Q_v4.fits",
+    dla_cnn: str = "data/dr16q/distfiles/DR16Q_v4.fits",
     dla_confidence: float = 0.98,
     num_dlas: int = 1,
 ):
@@ -1033,7 +1100,7 @@ def do_MAP_hist2d_parks(
     """
     if "dla_catalog_parks" not in dir(qsos):
         qsos.load_dla_parks(
-            dla_parks, p_thresh=dla_confidence, multi_dla=False, num_dla=1
+            dla_cnn, p_thresh=dla_confidence, multi_dla=False, num_dla=1
         )
 
     (
