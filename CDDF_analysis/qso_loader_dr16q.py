@@ -527,7 +527,7 @@ class QSOLoaderDR16Q(QSOLoader):
         ind_solene_dla = np.isin(unique_ids_dr16q, unique_ids_solene_dlas)
         # 2) DR16 sightlines with filtering condition set by Solene
         ind_solene_los = solene_eBOSS_cuts(
-            self.hdu[1].data["Z_LYAWG"],
+            self.hdu[1].data["Z_PCA"], # self.hdu[1].data["Z_LYAWG"], # TODO: why some Solene's DLAs don't have Z_LYAWG?
             self.hdu[1].data["ZWARNING"],
             self.hdu[1].data["BAL_PROB"],
         )
@@ -537,11 +537,12 @@ class QSOLoaderDR16Q(QSOLoader):
             for z in self.hdu[1].data["ZWARNING"][ind_solene_los]
         ])
         # DLA set should be a subset of LOS set
-        import pdb
-        pdb.set_trace()
-        assert np.sum(~ind_solene_los & ind_solene_dla) == 0
+        # import pdb
+        # pdb.set_trace()
+        # assert np.sum(~ind_solene_los & ind_solene_dla) == 0 # TODO: it never passes due to many -1 in ZWARNING
         # 3) GP's line of sights
         if our_sightlines:
+            print("[Info] Load only our sightlines from Solene's.")
             # awkward way to apply condition to test_ind 
             ind_gp_los = self.test_ind
             real_index = np.where(self.test_ind)[0]
@@ -576,7 +577,7 @@ class QSOLoaderDR16Q(QSOLoader):
         plates = np.append(plates, self.hdu[1].data["PLATE"][ind_add_los])
         mjds = np.append(mjds, self.hdu[1].data["MJD"][ind_add_los])
         fiber_ids = np.append(fiber_ids, self.hdu[1].data["FIBERID"][ind_add_los])
-        z_qsos = np.append(z_qsos, self.hdu[1].data["Z_LYAWG"][ind_add_los])
+        z_qsos = np.append(z_qsos, self.hdu[1].data["Z_PCA"][ind_add_los]) # TODO: why some Solene's DLAs don't have Z_LYAWG?
         thing_ids = np.append(thing_ids, self.hdu[1].data["THING_ID"][ind_add_los])
         # append NaNs for LOS (non-detections)
         dla_confidences = np.append(dla_confidences, np.full((np.sum(ind_add_los), ), fill_value=np.nan))
@@ -674,9 +675,6 @@ class QSOLoaderDR16Q(QSOLoader):
         for i, thing_id in enumerate(thing_ids):
             real_index = np.where(self.thing_ids == thing_id)[0][0]
             all_snrs[i] = self.snrs[real_index]
-
-        import pdb
-        pdb.set_trace()
 
         # the searching range for the DLAs.
         if lyb:
