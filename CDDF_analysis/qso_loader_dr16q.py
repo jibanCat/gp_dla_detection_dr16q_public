@@ -17,7 +17,7 @@ from astropy.io import fits
 from numpy.lib.type_check import real_if_close
 
 from .set_parameters import *
-from .qso_loader import QSOLoader, GPLoader, conditional_mvnpdf_low_rank, make_fig
+from .qso_loader import QSOLoader, GPLoader, conditional_mvnpdf_low_rank, make_fig, search_index_from_another
 from .voigt import Voigt_absorption
 from .effective_optical_depth import effective_optical_depth
 from .solene_dlas import solene_eBOSS_cuts, bitget_string
@@ -610,10 +610,11 @@ class QSOLoaderDR16Q(QSOLoader):
         dla_parks: str = "DR16Q_v4.fits", # DLA_CAT_SDSS_DR16.fits (Solene's catalog)
         p_thresh: float = 0.97,
         lyb: bool = False,
-        prior: bool = False,
+        min_1040: bool = False,
         search_range_from_ours: bool = False,
         solene_dlas: bool = False,
         voigt_fitter: bool = False,
+        our_sightlines: bool = True, # only works for Solene's catalog
     ) -> Tuple[
         np.ndarray,
         np.ndarray,
@@ -641,7 +642,7 @@ class QSOLoaderDR16Q(QSOLoader):
             print("[Info] Loading Solene's catalog")
             if "dict_solene" not in dir(self):
                 self.dict_solene = self.prediction_solene2dict(
-                    dla_parks, our_sightlines=True, voigt_fitter=voigt_fitter,
+                    dla_parks, our_sightlines=our_sightlines, voigt_fitter=voigt_fitter,
                 )
 
             cnn_catalog = self.dict_solene
@@ -650,8 +651,13 @@ class QSOLoaderDR16Q(QSOLoader):
             if voigt_fitter:
                 ind = np.isnan(cnn_catalog["log_nhis"])
                 assert np.all(cnn_catalog["log_nhis"][~ind] == cnn_catalog["log_nhis_fitter"][~ind])
+            else:
+                ind = np.isnan(cnn_catalog["log_nhis"])
+                assert ~np.all(cnn_catalog["log_nhis"][~ind] == cnn_catalog["log_nhis_fitter"][~ind])
 
         else:
+            assert not our_sightlines
+            # Here is assumed using our sightlines
             if "dict_parks" not in dir(self):
                 self.dict_parks = self.prediction_parks2dict(
                     dla_parks, selected_thing_ids=self.thing_ids
@@ -664,22 +670,32 @@ class QSOLoaderDR16Q(QSOLoader):
         thing_ids = cnn_catalog["thing_ids"]
         z_qsos = cnn_catalog["z_qso"]
 
-        # fixed range of the sightline ranging from 911A-1215A in rest-frame
-        # we should include all sightlines in the dataset
-
-        assert np.all(np.isin(thing_ids, self.thing_ids))
-
-        # for loop to get snrs from sbird's snrs file
+        # acquire SNR values: if it's a subset of our DLAs, take our own SNRs;
+        #   Otherwise, take it from DR16Q's SN_MEDIAN_ALL
         all_snrs = np.zeros(thing_ids.shape)
+        # double-check if all sightlines are in our selection function
+        if our_sightlines or not solene_dlas:
+            assert np.all(np.isin(thing_ids, self.thing_ids))
+            # for loop to get snrs from sbird's snrs file
+            for i, thing_id in enumerate(thing_ids):
+                real_index = np.where(self.thing_ids == thing_id)[0][0]
+                all_snrs[i] = self.snrs[real_index]
+        else:
+            mask_ind = search_index_from_another(cnn_catalog["thing_ids"], self.hdu[1].data["THING_ID"])
 
-        for i, thing_id in enumerate(thing_ids):
-            real_index = np.where(self.thing_ids == thing_id)[0][0]
-            all_snrs[i] = self.snrs[real_index]
+            all_snrs = self.hdu[1].data["SN_MEDIAN_ALL"][mask_ind]
+
+            # double-check the matching
+            real_index = np.where(self.hdu[1].data["THING_ID"] == thing_ids[0])[0][0]
+            assert self.hdu[1].data["SN_MEDIAN_ALL"][real_index] == all_snrs[0]
 
         # the searching range for the DLAs.
         if lyb:
             print("Searching min_z_dla: lyb ... ")
             min_z_dlas = (1 + z_qsos) * lyb_wavelength / lya_wavelength - 1
+        elif min_1040:
+            print("Searching min_z_dla: 1040 ... ")
+            min_z_dlas = (1 + z_qsos) * 1040 / lya_wavelength - 1
         else:
             min_z_dlas = (1 + z_qsos) * lyman_limit / lya_wavelength - 1
         print("Searching max_z_dla: lya ... ")
@@ -710,23 +726,7 @@ class QSOLoaderDR16Q(QSOLoader):
         z_dlas = cnn_catalog["z_dlas"][dla_inds]
         z_qsos = cnn_catalog["z_qso"][dla_inds]
         p_dlas = cnn_catalog["dla_confidences"][dla_inds]
-
-        # for loop to get snrs from sbird's snrs file
-        # Note arrays here are for DLA only
-        snrs = np.zeros(thing_ids.shape)
-        log_priors_dla = np.zeros(thing_ids.shape)
-
-        for i, thing_id in enumerate(thing_ids):
-            real_index = np.where(self.thing_ids == thing_id)[0][0]
-
-            snrs[i] = self.snrs[real_index]
-            log_priors_dla[i] = self.log_priors_dla[real_index]
-
-        # re-calculate dla_confidence based on prior of DLAs given z_qsos
-        if prior:
-            print("Applying our DLA prior ...")
-            p_dlas = p_dlas * np.exp(log_priors_dla)
-            p_dlas = p_dlas / np.max(p_dlas)
+        snrs = all_snrs[dla_inds]
 
         dla_inds = p_dlas > p_thresh
 
@@ -736,11 +736,12 @@ class QSOLoaderDR16Q(QSOLoader):
         z_qsos = z_qsos[dla_inds]
         p_dlas = p_dlas[dla_inds]
         snrs = snrs[dla_inds]
-        log_priors_dla = log_priors_dla[dla_inds]
 
         # get rid of z_dlas larger than z_qsos or lower than lyman limit
         if lyb:
             z_cut_inds = z_dlas > ((1 + z_qsos) * lyb_wavelength / lya_wavelength - 1)
+        elif min_1040:
+            z_cut_inds = z_dlas > ((1 + z_qsos) * 1040 / lya_wavelength - 1)
         else:
             z_cut_inds = z_dlas > ((1 + z_qsos) * lyman_limit / lya_wavelength - 1)
 
@@ -750,7 +751,7 @@ class QSOLoaderDR16Q(QSOLoader):
 
         if search_range_from_ours:
             # we are not sure if the search range is lyb in the processed file
-            assert lyb is False
+            assert lyb is False and min_1040 is False
 
             # for loop to get min z_dlas and max z_dlas search range from processed data
             _min_z_dlas = np.zeros(thing_ids.shape)
@@ -775,7 +776,6 @@ class QSOLoaderDR16Q(QSOLoader):
         z_qsos = z_qsos[z_cut_inds]
         p_dlas = p_dlas[z_cut_inds]
         snrs = snrs[z_cut_inds]
-        log_priors_dla = log_priors_dla[z_cut_inds]
 
         self.cnn_catalog = {}
 
