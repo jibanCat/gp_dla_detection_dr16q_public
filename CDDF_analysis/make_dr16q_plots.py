@@ -732,6 +732,7 @@ def do_Parks_dNdX(
     search_range_from_ours: bool = False,
     plot_gp: bool = True,
     subdir_gp: str = "CDDF_analysis/dr16q_full_int_lyb_occam_zqso7_1_30_delta_z_0_1/",
+    lnhi_min: float = 20.3,
 ):
     """
     Plot dNdX for Parks' CNN model in the DR16Q
@@ -759,6 +760,7 @@ def do_Parks_dNdX(
         solene_dlas=solene_dlas,
         voigt_fitter=voigt_fitter,
         our_sightlines=our_sightlines,
+        lnhi_min=lnhi_min,
     )
     np.savetxt(os.path.join(subdir, "dndx_all.txt"), (z_cent, dNdX))
 
