@@ -831,6 +831,8 @@ class QSOLoaderDR16Q(QSOLoader):
         Parks (bool) : whether to plot Parks' results
         Solene (bool) : whether to plot Solene's results
         dla_solene (str) : if Solene=True, specify the path to Solene' `DLA_CAT_SDSS_DR16.fits`
+        voigt_fitter (bool) : only works if Solene=True. Plot an additional line for the DLAs from
+            Voigt fitter in Solene's catalogue.
 
         Returns:
         ----
@@ -965,7 +967,7 @@ class QSOLoaderDR16Q(QSOLoader):
         # get Solene model
         if Solene:
             if not "dict_solene" in dir(self):
-                self.dict_solene = self.prediction_solene2dict(dla_solene, our_sightlines=True, voigt_fitter=voigt_fitter)
+                self.dict_solene = self.prediction_solene2dict(dla_solene, our_sightlines=True, voigt_fitter=False)
 
             dict_solene = self.dict_solene
 
@@ -1007,6 +1009,57 @@ class QSOLoaderDR16Q(QSOLoader):
 
                 this_solene_mu = this_solene_mu * absorption
 
+        # get Solene model's voigt fitter:
+        # because we want it to be overplotted with Solene's DLAs
+        if Solene and voigt_fitter:
+            if not "dict_solene" in dir(self):
+                self.dict_solene = self.prediction_solene2dict(dla_solene, our_sightlines=True, voigt_fitter=False)
+
+            dict_solene = self.dict_solene
+
+            # construct an array of unique ids for los
+            self.unique_ids = self.make_unique_id(
+                self.plates, self.mjds, self.fiber_ids
+            )
+            unique_ids = self.make_unique_id(
+                dict_solene["plates"], dict_solene["mjds"], dict_solene["fiber_ids"]
+            )
+            assert unique_ids.dtype is np.dtype("int64")
+            assert self.unique_ids.dtype is np.dtype("int64")
+
+            uids = np.where(unique_ids == self.unique_ids[nspec])[0]
+
+            this_solene_mu_fitter = this_mu_original
+
+            dla_confidences_solene_fitter = []
+            z_dlas_solene_fitter = []
+            log_nhis_solene_fitter = []
+
+            for uid in uids:
+                z_dla_solene_fitter = dict_solene["z_dlas"][uid]
+                log_nhi_solene_fitter = dict_solene["log_nhis_fitter"][uid]
+                dla_confidence_solene_fitter = dict_solene["dla_confidences"][uid]
+
+                dla_confidences_solene_fitter.append(dla_confidence_solene_fitter)
+                z_dlas_solene_fitter.append(z_dla_solene_fitter)
+                log_nhis_solene_fitter.append(log_nhi_solene_fitter)
+
+                if np.any(np.isnan(dict_solene["dla_confidences"][uid])):
+                    continue
+                
+                # if this DLA has not applied the fitter, it's -1
+                if log_nhi_solene_fitter == -1:
+                    continue
+
+                absorption = Voigt_absorption(
+                    rest_wavelengths * (1 + self.z_qsos[nspec]),
+                    10 ** log_nhi_solene_fitter,
+                    z_dla_solene_fitter,
+                    num_lines=1,
+                )
+
+                this_solene_mu_fitter = this_solene_mu_fitter * absorption
+
         # plt.figure(figsize=(16, 5))
         if new_fig:
             make_fig()
@@ -1033,13 +1086,26 @@ class QSOLoaderDR16Q(QSOLoader):
             plt.plot(
                 rest_wavelengths,
                 this_solene_mu,
-                label=r"Solene: z_dlas = ({}); lognhis=({}); p_dlas=({})".format(
+                label=r"Solene (NHI_CNN): z_dlas = ({}); lognhis=({}); p_dlas=({})".format(
                     ",".join("{:.3g}".format(z) for z in z_dlas_solene),
                     ",".join("{:.3g}".format(n) for n in log_nhis_solene),
                     ",".join("{:.3g}".format(p) for p in dla_confidences_solene),
                 ),
                 color="magenta",
             )
+
+        if Solene and voigt_fitter:
+            plt.plot(
+                rest_wavelengths,
+                this_solene_mu_fitter,
+                label=r"Solene (NHI_FIT): z_dlas = ({}); lognhis=({}); p_dlas=({})".format(
+                    ",".join("{:.3g}".format(z) for z in z_dlas_solene_fitter),
+                    ",".join("{:.3g}".format(n) for n in log_nhis_solene_fitter),
+                    ",".join("{:.3g}".format(p) for p in dla_confidences_solene_fitter),
+                ),
+                color="greenyellow",
+            )
+
 
         if nth >= 0:
             plt.plot(
