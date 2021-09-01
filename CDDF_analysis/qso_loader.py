@@ -917,6 +917,9 @@ class QSOLoader(object):
 
     @staticmethod
     def make_unique_id(plates, mjds, fiber_ids):
+        plates = np.int64(plates)
+        mjds = np.int64(mjds)
+        fiber_ids = np.int64(fiber_ids)
         return plates * 10 ** 9 + mjds * 10 ** 4 + fiber_ids
 
     def make_multi_unique_id(self, num_dla, plates, mjds, fiber_ids):
@@ -1570,7 +1573,6 @@ class QSOLoader(object):
 
             snrs[i] = self.snrs[real_index]
             log_priors_dla[i] = self.log_priors_dla[real_index]
-
         # re-calculate dla_confidence based on prior of DLAs given z_qsos
         if prior:
             p_dlas = p_dlas * np.exp(log_priors_dla)
@@ -1765,6 +1767,12 @@ class QSOLoader(object):
         else:
             tot_f_N, NHI_table = np.histogram(10 ** log_nhis, 10 ** lnhis)
 
+        # Remove duplicate sightlines
+        # TODO: This strongly disagrees with N12. Comment out for now.
+        _, real_index = np.unique(unique_ids, return_index=True)
+        # dX = self.path_length(min_z_dlas[real_index], max_z_dlas[real_index], z_min, z_max)
+        # 
+        # Only counts maximum 1 DLA per spec. Multiple DLAs count multiply
         dX = self.path_length(min_z_dlas, max_z_dlas, z_min, z_max)
         dN = np.array(
             [
@@ -1867,6 +1875,17 @@ class QSOLoader(object):
         else:
             ndlas, _ = np.histogram(z_dlas, z_bins)
 
+        # Remove duplicate sightlines
+        # TODO: This strongly disagrees with N12. Comment out for now.
+        # _, real_index = np.unique(unique_ids, return_index=True)
+        # dX = np.array(
+        #     [
+        #         self.path_length(min_z_dlas[real_index], max_z_dlas[real_index], z_m, z_x)
+        #         for (z_m, z_x) in zip(z_bins[:-1], z_bins[1:])
+        #     ]
+        # )
+        # 
+        # Only counts maximum 1 DLA per spec. Multiple DLAs count multiply
         # calc dX for z_bins
         dX = np.array(
             [
@@ -1961,6 +1980,17 @@ class QSOLoader(object):
         # proton mass in g
         protonmass = 1.67262178e-24
 
+        # Remove duplicate sightlines
+        # TODO: This strongly disagrees with N12. Comment out for now.
+        # _, real_index = np.unique(unique_ids, return_index=True)
+        # dX = np.array(
+        #     [
+        #         self.path_length(min_z_dlas[real_index], max_z_dlas[real_index], z_m, z_x)
+        #         for (z_m, z_x) in zip(z_bins[:-1], z_bins[1:])
+        #     ]
+        # )
+        # 
+        # Only counts maximum 1 DLA per spec. Multiple DLAs count multiply
         # calc dX for z_bins
         dX = np.array(
             [
