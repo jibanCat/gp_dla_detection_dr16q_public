@@ -516,7 +516,7 @@ class QSOLoaderDR16Q(QSOLoader):
 
             log_nhis = log_nhis_fitter
 
-            assert np.all( log_nhis_fitter >= 19.3 ) # strangely the min of fitter is ~19.3
+            assert np.all( log_nhis_fitter >= 19.2 ) # strangely the min of fitter is ~19.29
 
         # only append the thingIDs that are not in Solene's DLAs
         # 1) search Solene's DLA thingIDs in DR16Q
